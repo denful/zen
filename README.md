@@ -20,9 +20,8 @@ Zen is a thin kernel built to provide only essential features a module system *m
 
 | What | How |
 |------|-----|
-| **N → 1 merge** | [`bend`](https://github.com/denful/bend) lenses |
-| **Checks** (what is valid) | `bend` + [`nix-effects`](https://github.com/kleisli-io/nix-effects) MLTT types and proofs |
-| **Schema** (how to merge) | `bend` lenses |
+| **N → 1** (how to merge module contribs) | [`bend`](https://github.com/denful/bend) lenses |
+| **Types** (what is valid) | `bend` + [`nix-effects`](https://github.com/kleisli-io/nix-effects) MLTT types and proofs |
 | **Fixpoint** (modules read the merged config) | [`ned`](https://github.com/denful/ned) cycles |
 
 Everything else — types, merge strategies, submodules, import-trees — lives outside the kernel, in `bend`, `ned`, `nix-effects`, or caller code.
