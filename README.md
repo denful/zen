@@ -40,7 +40,7 @@ Everything else — types, merge strategies, submodules, import-trees — lives 
 | zen without nixpkgs import | 293 ms | **42×** |
 | eval-only (estimated) | ~110 ms | **~100×** |
 
-Zen never calls `evalModules` recursively, in nixpkgs this is how a new fixed-point is created for submodules, Zen relies on Ned `scope-d` which uses nix-effect's `fx.rotate` to provide scoped handlers with no impact.
+Zen never calls `evalModules` recursively, in nixpkgs this is how a new fixed-point is created for submodules, Zen relies on Ned `scope-d` which uses nix-effect's [`fx.rotate`](https://github.com/kleisli-io/nix-effects/pull/8) to provide scoped handlers with no impact.
 
 ---
 
