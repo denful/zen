@@ -25,7 +25,7 @@ Zen is a thin kernel (~22 LoC) built on three irreducible primitives of any modu
 | **Schema** (what is valid, how to merge) | `bend` lenses |
 | **Fixpoint** (modules read the merged config) | [`ned`](https://github.com/denful/ned) cycles |
 
-Everything else — types, merge strategies, submodules, import trees — lives outside the kernel, in `bend`, `ned`, or caller code.
+Everything else — types, merge strategies, submodules, import-trees — lives outside the kernel, in `bend`, `ned`, `nix-effects`, or caller code.
 
 
 **Performance vs `lib.evalModules`** (10 000 modules, `listOf (submodule {deps = listOf submodule})`):
@@ -64,36 +64,34 @@ The kernel's job is to connect `ned.run` to `bend` lenses. That connection is ~2
 ## Public surface
 
 ```
-zen.run    { lens, defs }                              →  Either config errors
+zen.run    { lens, defs }                              →  Either errors config
 zen.nixmod.evalModules { lib, modules, specialArgs? }  →  { config }
 ```
 
-All other functionality is `bend.*` and `ned.*`.
+All other functionality is `bend.*`, `ned.*` or `fx.*`. 
 
 
 ### Schema is a lens, not a declaration
 
 In nixpkgs, an option is a record: `{ type, merge, default, description, ... }`. The system extracts fields and calls them in fixed order, with special handling for each.
 
-In Zen, an option is a single `bend` lens: `[Def] → Either value error`. Merge strategy, type validation, and default handling are one composed pipeline — `bend.pipe [ mergeStep typeStep ]`. The kernel calls only `.get`. There is no unpacking, no special cases.
+In Zen, an option is a single `bend` lens: `[Def] → Either value error`. Merge strategy, type validation (nix-effect's MLTT), and default handling are one composed pipeline — `bend.pipe [ mergeStep typeStep ]`. The kernel calls only `.get`. There is no unpacking, no special cases.
 
 This is intentional. A lens is already the right abstraction: it transforms data or explains why it can't. A wrapper struct around it is indirection without gain.
 
 ### Validation is parsing
 
-Zen uses `bend` for all type checking. A type is not a predicate that returns `true`/`false` — it is a lens that returns `right typedValue` or `left error`. This means:
+Zen uses `bend` for all type checking. A type is not a predicate that returns `true`/`false` — it is a lens that returns `right typedValue` or `left error`. Type system are usable from nix-effect's MLTT. This means:
 
 - All errors are collected in one pass, not thrown on first failure.
 - Error data is structured — machines can read it, not just humans.
-- No `throw`, no `abort`, no `assert` anywhere in the kernel.
-
-This follows [Parse, Don't Validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/): a validator that returns `true` discards the proof it just computed. A lens that returns `right { head; tail; }` *is* the proof.
+- No `throw`, anywhere in the kernel.
 
 ### The fixpoint is explicit
 
 Nixpkgs's `config` reads `config` because `lib.fix` creates a lazy attrset where the fixpoint is implicit — a property of the evaluation engine, not of the module code.
 
-Zen makes it explicit: each `def` is a function `srcs → ST Def`, and `srcs.config` is the per-option merged result. `ned.run` wires the cycle. Nix laziness makes it safe. The fixpoint mechanism is inspectable, composable, and auditable without reading the internals of `lib`.
+Zen makes it explicit: each `def` is a Cycle function `sources → ST Def`, and `sources.config` is the per-option merged result. `ned.run` wires the cycle. Nix laziness makes it safe. The fixpoint mechanism is inspectable, composable, and auditable without reading the internals of `lib`.
 
 ### No imports
 
