@@ -27,77 +27,6 @@ Zen is a thin kernel (~22 LoC) built on three irreducible primitives of any modu
 
 Everything else — types, merge strategies, submodules, import trees — lives outside the kernel, in `bend`, `ned`, or caller code.
 
-## Install
-
-Zen depends on [Bend](https://github.com/denful/bend) (for Structured Lens / Validation / Merging), [Ned](https://github.com/denful/ned) (for cycle-based fixed-point) and [nix-effects](https://github.com/kleisli-io/nix-effects) (streams, effect rotation and scoped handlers for submoules)
-
-```nix
-# flake.nix
-inputs.zen.url  = "github:denful/zen";
-
-zen = inputs.zen.lib;
-```
-
-```nix
-# default.nix
-zen = import zen-src { };
-```
-
-## Usage
-
-```nix
-let
-  inherit (zen) bend ned;
-  inherit (builtins) length head;
-
-  # Schema: one bend lens per option.
-  # lens.get :: [Def] → Either value error
-  # You compose merge + type yourself — no hidden magic.
-  uniqueInt = bend.pipe [
-    (bend.parse (defs:
-      if defs == []            then bend.left  { why = "required"; }
-      else if length defs == 1 then bend.right (head defs).value
-      else                          bend.left  { why = "conflict"; inherit defs; }
-    ) bend.identity)
-    bend.int
-  ];
-
-  # Def: a function srcs → ST Def (stream of contributions)
-  portMod = _srcs: ned.st.fromList [
-    { name = "port"; value = 8080; file = ./port.nix; prio = 100; }
-  ];
-
-  hostMod = srcs:
-    # Defs can read the final merged config — this is the fixpoint.
-    let port = if srcs.config.port ? right then srcs.config.port.right else 80;
-    in ned.st.fromList [
-      { name = "host"; value = "localhost:${toString port}"; file = ./host.nix; prio = 100; }
-    ];
-
-in
-zen.run {
-  lens = { port = uniqueInt; host = uniqueInt; };
-  defs = [ portMod hostMod ];
-}
-# → { right = { port = 8080; host = "localhost:8080"; }; }
-```
-
-## nixpkgs Compatibility
-
-`zen.nixmod.evalModules` accepts nixpkgs-style modules unchanged:
-
-```nix
-zen.nixmod.evalModules {
-  inherit lib;
-  modules = [
-    { lib, config, ... }: {
-      options.port = lib.mkOption { type = lib.types.int; default = 8080; };
-      options.host = lib.mkOption { type = lib.types.str; default = "localhost"; };
-      config.host  = "example.com:${toString config.port}";
-    }
-  ];
-}
-```
 
 **Performance vs `lib.evalModules`** (10 000 modules, `listOf (submodule {deps = listOf submodule})`):
 
@@ -188,7 +117,82 @@ Nixpkgs creates a new `evalModules` call for each submodule value. At scale — 
 
 In Zen, submodule boundaries are `ned.scope-d` boundaries. Unhandled effects rotate outward to the parent cycle's driver. No recursive kernel invocation. nix-effect's fx.rotate has no performance impact and allows well defined isolation / composition of effectful streams on cycles.
 
+--
 
 ## [zer0ver](https://0ver.org)
 
 Zen uses 0-based versioning. `v0.x`
+
+--
+
+## Install
+
+Zen depends on [Bend](https://github.com/denful/bend) (for Structured Lens / Validation / Merging), [Ned](https://github.com/denful/ned) (for cycle-based fixed-point) and [nix-effects](https://github.com/kleisli-io/nix-effects) (streams, effect rotation and scoped handlers for submoules)
+
+```nix
+# flake.nix
+inputs.zen.url  = "github:denful/zen";
+
+zen = inputs.zen.lib;
+```
+
+```nix
+# default.nix
+zen = import zen-src { };
+```
+
+## Usage
+
+```nix
+let
+  inherit (zen) bend ned;
+  inherit (builtins) length head;
+
+  # Schema: one bend lens per option.
+  # lens.get :: [Def] → Either value error
+  # You compose merge + type yourself — no hidden magic.
+  uniqueInt = bend.pipe [
+    (bend.parse (defs:
+      if defs == []            then bend.left  { why = "required"; }
+      else if length defs == 1 then bend.right (head defs).value
+      else                          bend.left  { why = "conflict"; inherit defs; }
+    ) bend.identity)
+    bend.int
+  ];
+
+  # Def: a function srcs → ST Def (stream of contributions)
+  portMod = _srcs: ned.st.fromList [
+    { name = "port"; value = 8080; file = ./port.nix; prio = 100; }
+  ];
+
+  hostMod = srcs:
+    # Defs can read the final merged config — this is the fixpoint.
+    let port = if srcs.config.port ? right then srcs.config.port.right else 80;
+    in ned.st.fromList [
+      { name = "host"; value = "localhost:${toString port}"; file = ./host.nix; prio = 100; }
+    ];
+
+in
+zen.run {
+  lens = { port = uniqueInt; host = uniqueInt; };
+  defs = [ portMod hostMod ];
+}
+# → { right = { port = 8080; host = "localhost:8080"; }; }
+```
+
+## nixpkgs Compatibility
+
+`zen.nixmod.evalModules` accepts nixpkgs-style modules unchanged:
+
+```nix
+zen.nixmod.evalModules {
+  inherit lib;
+  modules = [
+    { lib, config, ... }: {
+      options.port = lib.mkOption { type = lib.types.int; default = 8080; };
+      options.host = lib.mkOption { type = lib.types.str; default = "localhost"; };
+      config.host  = "example.com:${toString config.port}";
+    }
+  ];
+}
+```
