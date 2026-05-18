@@ -11,14 +11,14 @@ concurrency:
 env:
   NIX_PATH: "nixpkgs=https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.xz"
 jobs:
-  test:
-    name: test
+  bench:
+    name: bench
     runs-on: ubuntu-latest
     steps:
       - uses: wimpysworld/nothing-but-nix@main
       - uses: cachix/install-nix-action@v31
       - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: actions/checkout@v6
-      - name: CI
-        run: nix-shell ./shell.nix --run 'just ci'
+      - name: Bench
+        run: nix-shell ./shell.nix --run 'just bench'
 
