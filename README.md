@@ -22,11 +22,11 @@ Everything else — types, merge strategies, submodules, import trees — lives 
 
 ## Install
 
+Zen depends on [Bend](https://github.com/denful/bend) (for Structured Lens / Validation / Merging), [Ned](https://github.com/denful/ned) (for cycle-based fixed-point) and [nix-effects](https://github.com/kleisli-io/nix-effects) (streams, effect rotation and scoped handlers for submoules)
+
 ```nix
 # flake.nix
 inputs.zen.url  = "github:denful/zen";
-inputs.bend.url = "github:denful/bend";
-inputs.ned.url  = "github:denful/ned";
 
 zen = inputs.zen.lib;
 ```
@@ -115,6 +115,22 @@ The speedup comes from Zen's sparse walk: each module only touches the options i
 
 Nixpkgs, adios, and Zen all do these three things. Zen does nothing else.
 
+### Minimalism as constraint
+
+Every feature that could be added to Zen already exists in `bend` or `ned`. Adding the same feature to Zen would mean maintaining two implementations of the same idea.
+
+The kernel's job is to connect `ned.run` to `bend` lenses. That connection is ~22 lines. Everything built on top of it uses the same primitives the caller already has access to.
+
+## Public surface
+
+```
+zen.run    { lens, defs }                              →  Either config errors
+zen.nixmod.evalModules { lib, modules, specialArgs? }  →  { config }
+```
+
+All other functionality is `bend.*` and `ned.*`.
+
+
 ### Schema is a lens, not a declaration
 
 In nixpkgs, an option is a record: `{ type, merge, default, description, ... }`. The system extracts fields and calls them in fixed order, with special handling for each.
@@ -161,24 +177,6 @@ Nixpkgs creates a new `evalModules` call for each submodule value. At scale — 
 
 In Zen, submodule boundaries are `ned.scope-d` boundaries. Unhandled effects rotate outward to the parent cycle's driver. No recursive kernel invocation. The kernel stays O(N × defs\_per\_module).
 
-### Minimalism as constraint
-
-Every feature that could be added to Zen already exists in `bend` or `ned`. Adding the same feature to Zen would mean maintaining two implementations of the same idea.
-
-The kernel's job is to connect `ned.run` to `bend` lenses. That connection is ~22 lines. Everything built on top of it uses the same primitives the caller already has access to.
-
----
-
-## Public surface
-
-```
-zen.run    { lens, defs }                              →  Either config errors
-zen.nixmod.evalModules { lib, modules, specialArgs? }  →  { config }
-```
-
-All other functionality is `bend.*` and `ned.*`.
-
----
 
 ## [zer0ver](https://0ver.org)
 
