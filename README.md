@@ -149,7 +149,7 @@ Zen receives a flat list of `defs`. How that list was assembled — from files, 
 
 ### Modules communicate via streams, not flags
 
-In nixpkgs, inter-module coordination requires `enable` options: module A checks `config.services.foo.enable`. This is string-typed coupling — every module that wants to react to another must know its option path.
+In nixpkgs, inter-module coordination requires `enable` options: module A checks `config.services.foo.enable`. every module that wants to react to another must know its option path.
 
 Zen modules are isolated. They emit to named sinks and read from named sources. A parent cycle can install a driver that handles "who provides capability X?" without any module knowing any other module's name. This is the same idea as Erlang supervision trees or Akka discovery: actors that communicate through a channel, not by pointing at each other.
 
