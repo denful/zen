@@ -101,6 +101,10 @@ zen.nixmod.evalModules {
 
 **Performance vs `lib.evalModules`** (10 000 modules, `listOf (submodule {deps = listOf submodule})`):
 
+> [!NOTE]
+> Run benchmarks locally using `nix-shell --run 'just bench'`
+> Or see [bench workflows](https://github.com/denful/zen/actions/workflows/bench.yml) 
+
 | | Wall clock | vs nixpkgs |
 |--|--|--|
 | `lib.evalModules` | 12.3 s | baseline |
@@ -108,7 +112,7 @@ zen.nixmod.evalModules {
 | zen without nixpkgs import | 293 ms | **42×** |
 | eval-only (estimated) | ~110 ms | **~100×** |
 
-The speedup comes from Zen's sparse walk: each module only touches the options it actually sets. Zen never calls `evalModules` recursively for submodule type checking.
+Zen never calls `evalModules` recursively, in nixpkgs this is how a new fixed-point is created for submodules, Zen relies on Ned `scope-d` which uses nix-effect's `fx.rotate` to provide scoped handlers with no impact.
 
 ---
 
