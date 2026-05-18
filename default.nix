@@ -1,6 +1,6 @@
 {
   inputs ? import ./dev/with-inputs.nix { },
-  lib ? inputs.nixpkgs.lib, 
+  lib ? inputs.nixpkgs.lib,
   ...
 }:
 let
@@ -20,6 +20,9 @@ let
     in
     builtins.foldl' (acc: val: acc // val) { } imports;
 
-  zen = { inherit fx ned bend; } // readDirImports ./nix;
+  zen = {
+    inherit fx ned bend;
+  }
+  // readDirImports ./nix;
 in
 zen

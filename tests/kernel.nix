@@ -5,36 +5,64 @@ let
 
   # Lens: unique merge ([Def] → Either value _) + no type check
   anyL = bend.pipe [
-    (bend.parse (defs:
-      if defs == [ ] then bend.left { why = "required"; }
-      else if length defs == 1 then bend.right (head defs).value
-      else bend.left { why = "conflict"; inherit defs; }
+    (bend.parse (
+      defs:
+      if defs == [ ] then
+        bend.left { why = "required"; }
+      else if length defs == 1 then
+        bend.right (head defs).value
+      else
+        bend.left {
+          why = "conflict";
+          inherit defs;
+        }
     ) bend.identity)
     bend.identity
   ];
 
   # Lens: unique merge + int type
   intL = bend.pipe [
-    (bend.parse (defs:
-      if defs == [ ] then bend.left { why = "required"; }
-      else if length defs == 1 then bend.right (head defs).value
-      else bend.left { why = "conflict"; inherit defs; }
+    (bend.parse (
+      defs:
+      if defs == [ ] then
+        bend.left { why = "required"; }
+      else if length defs == 1 then
+        bend.right (head defs).value
+      else
+        bend.left {
+          why = "conflict";
+          inherit defs;
+        }
     ) bend.identity)
     bend.int
   ];
 
   # Lens: unique merge + str type
   strL = bend.pipe [
-    (bend.parse (defs:
-      if defs == [ ] then bend.left { why = "required"; }
-      else if length defs == 1 then bend.right (head defs).value
-      else bend.left { why = "conflict"; inherit defs; }
+    (bend.parse (
+      defs:
+      if defs == [ ] then
+        bend.left { why = "required"; }
+      else if length defs == 1 then
+        bend.right (head defs).value
+      else
+        bend.left {
+          why = "conflict";
+          inherit defs;
+        }
     ) bend.identity)
     bend.str
   ];
 
-  mkDef = name: value:
-    _srcs: ned.st.fromList [ { inherit name value; file = "test"; prio = 100; } ];
+  mkDef =
+    name: value: _srcs:
+    ned.st.fromList [
+      {
+        inherit name value;
+        file = "test";
+        prio = 100;
+      }
+    ];
 
 in
 {
@@ -42,25 +70,31 @@ in
 
     # T1: single def, single option → right
     test-single-def-right = {
-      expr =
-        zen.run {
-          lens = { port = intL; };
-          defs = [ (mkDef "port" 8080) ];
+      expr = zen.run {
+        lens = {
+          port = intL;
         };
+        defs = [ (mkDef "port" 8080) ];
+      };
       expected = bend.right { port = 8080; };
     };
 
     # T6: multiple options, all present → right
     test-multi-option-right = {
-      expr =
-        zen.run {
-          lens = { port = intL; host = strL; };
-          defs = [
-            (mkDef "port" 8080)
-            (mkDef "host" "localhost")
-          ];
+      expr = zen.run {
+        lens = {
+          port = intL;
+          host = strL;
         };
-      expected = bend.right { port = 8080; host = "localhost"; };
+        defs = [
+          (mkDef "port" 8080)
+          (mkDef "host" "localhost")
+        ];
+      };
+      expected = bend.right {
+        port = 8080;
+        host = "localhost";
+      };
     };
 
     # T2: conflict — 2 defs for same option → left
@@ -68,7 +102,9 @@ in
       expr =
         let
           result = zen.run {
-            lens = { port = intL; };
+            lens = {
+              port = intL;
+            };
             defs = [
               (mkDef "port" 8080)
               (mkDef "port" 9000)
@@ -84,7 +120,9 @@ in
       expr =
         let
           result = zen.run {
-            lens = { port = intL; };
+            lens = {
+              port = intL;
+            };
             defs = [ ];
           };
         in
@@ -97,7 +135,9 @@ in
       expr =
         let
           result = zen.run {
-            lens = { port = intL; };
+            lens = {
+              port = intL;
+            };
             defs = [ (mkDef "port" "not-an-int") ];
           };
         in
@@ -110,19 +150,34 @@ in
       expr =
         let
           portDef = mkDef "port" 8080;
-          hostDef = srcs:
+          hostDef =
+            srcs:
             let
               port = if srcs.config.port ? right then srcs.config.port.right else 80;
             in
             ned.st.fromList [
-              { name = "host"; value = "localhost:${toString port}"; file = "test"; prio = 100; }
+              {
+                name = "host";
+                value = "localhost:${toString port}";
+                file = "test";
+                prio = 100;
+              }
             ];
         in
         zen.run {
-          lens = { port = intL; host = strL; };
-          defs = [ portDef hostDef ];
+          lens = {
+            port = intL;
+            host = strL;
+          };
+          defs = [
+            portDef
+            hostDef
+          ];
         };
-      expected = bend.right { port = 8080; host = "localhost:8080"; };
+      expected = bend.right {
+        port = 8080;
+        host = "localhost:8080";
+      };
     };
 
     # T7: partial errors — port fails, host passes → left with mixed results
@@ -130,7 +185,10 @@ in
       expr =
         let
           result = zen.run {
-            lens = { port = intL; host = strL; };
+            lens = {
+              port = intL;
+              host = strL;
+            };
             defs = [
               (mkDef "port" 8080)
               (mkDef "port" 9000)
@@ -138,9 +196,7 @@ in
             ];
           };
         in
-        result ? left
-        && result.left.port ? left
-        && result.left.host ? right;
+        result ? left && result.left.port ? left && result.left.host ? right;
       expected = true;
     };
 
