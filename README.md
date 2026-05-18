@@ -8,6 +8,13 @@
 
 > zen and [vic](https://bsky.app/profile/oeiuwq.bsky.social)'s [dendritic libs](https://dendritic.oeiuwq.com) made for you with Love++ and AI--. If you like my work, consider [sponsoring](https://dendritic.oeiuwq.com/sponsor)
 
+
+> [!WARNING]
+> 
+> Zen is currently experimental, while the architecture and design principles are well stablished and the minimal kernel works, we still have a lot to work on UX for it to actually be used.
+> 
+> Zen's nixpkgs compatibility layer is currenty not intended to be a drop-in replacement for lib.evalModules, it was made as way to ensure that zen modules evaluate to the same output as nixpkgs would do.
+
 # **Zen**. A minimal stream-based Nix module system.
 
 Zen is a thin kernel (~22 LoC) built on three irreducible primitives of any module system:
@@ -175,7 +182,7 @@ This makes modules independently testable and recomposable. It also makes new in
 
 Nixpkgs creates a new `evalModules` call for each submodule value. At scale — 10 000 modules, each with nested submodule lists — this is O(N × depth) evaluations with full fixpoint setup per call.
 
-In Zen, submodule boundaries are `ned.scope-d` boundaries. Unhandled effects rotate outward to the parent cycle's driver. No recursive kernel invocation. The kernel stays O(N × defs\_per\_module).
+In Zen, submodule boundaries are `ned.scope-d` boundaries. Unhandled effects rotate outward to the parent cycle's driver. No recursive kernel invocation. nix-effect's fx.rotate has no performance impact and allows well defined isolation / composition of effectful streams on cycles.
 
 
 ## [zer0ver](https://0ver.org)
