@@ -16,7 +16,7 @@
 
 # **Zen**. A minimal stream-based Nix module system.
 
-Zen is a thin kernel (~22 LoC) built on three irreducible primitives of any module system:
+Zen is a thin kernel built to provide only essential features a module system *must* have:
 
 | What | How |
 |------|-----|
