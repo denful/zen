@@ -6,7 +6,6 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/denful/zen" alt="License"/></a>
 </p>
 
-> zen and [vic](https://bsky.app/profile/oeiuwq.bsky.social)'s [dendritic libs](https://dendritic.oeiuwq.com) made for you with Love++ and AI--. If you like my work, consider [sponsoring](https://dendritic.oeiuwq.com/sponsor)
 
 
 > [!WARNING]
