@@ -20,5 +20,3 @@ test suite="all" *args:
 bench runs="10" warmup="3":
   cd benchmarks && RUNS={{runs}} WARMUP={{warmup}} ./bench.sh
 
-bench-export file="benchmarks/results.md" runs="20" warmup="5":
-  cd benchmarks && RUNS={{runs}} WARMUP={{warmup}} EXPORT={{file}} ./bench.sh

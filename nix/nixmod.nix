@@ -1,6 +1,13 @@
 zen:
 let
   inherit (zen) bend ned;
+  inherit (zen.merge) concat attrs;
+  byPrio =
+    defs:
+    if builtins.length defs == 1 then
+      builtins.head defs
+    else
+      builtins.head (builtins.sort (a: b: a.prio < b.prio) defs);
   inherit (builtins)
     isAttrs
     isFunction
@@ -8,18 +15,19 @@ let
     foldl'
     attrNames
     intersectAttrs
-    sort
+    mapAttrs
     filter
     isString
     split
     head
     tail
     groupBy
+    map
     ;
 
-  # "a.b.c" → ["a" "b" "c"]
+  # flat dotted-path helpers
   splitDot = k: filter isString (split "\\." k);
-
+  joinPath = pre: k: if pre == "" then k else "${pre}.${k}";
   setPath =
     path: val: acc:
     let
@@ -27,23 +35,23 @@ let
       rest = tail path;
     in
     acc // { ${k} = if rest == [ ] then val else setPath rest val (acc.${k} or { }); };
-
   unflatten = flat: foldl' (acc: k: setPath (splitDot k) flat.${k} acc) { } (attrNames flat);
 
-  # nixpkgs type → merge strategy
+  stratMap = {
+    listOf = "concat";
+    lazyListOf = "concat";
+    attrsOf = "attrs";
+    lazyAttrsOf = "attrs";
+    attrs = "attrs";
+  };
   strat =
     t:
     let
       n = if t == null || !isAttrs t then "" else t.name or "";
     in
-    if n == "listOf" || n == "lazyListOf" then
-      "concat"
-    else if n == "attrsOf" || n == "lazyAttrsOf" || n == "attrs" then
-      "attrs"
-    else
-      "first";
+    stratMap.${n} or "first";
 
-  # option → bend lens: [Def] → Either value error
+  # build a lens from a nixpkgs option
   optL =
     opt:
     let
@@ -55,31 +63,31 @@ let
       if defs == [ ] then
         if d != null then bend.right d else bend.left { why = "required"; }
       else if s == "concat" then
-        bend.right (concatLists (map (x: x.value) defs))
+        concat defs
       else if s == "attrs" then
-        bend.right (foldl' (a: x: a // x.value) { } defs)
+        attrs defs
       else
-        bend.right (head (sort (a: b: a.prio < b.prio) defs)).value
+        bend.right (byPrio defs).value
     ) bend.identity;
 
-  # flatten options tree → { "dot.path" → bend_lens }
+  # flatten nixpkgs options attrset → { "a.b" = lens }, accumulator threaded
   flatLens =
-    pfx: opts:
+    pfx: acc: opts:
     foldl' (
       acc: k:
       let
         v = opts.${k};
-        p = if pfx == "" then k else "${pfx}.${k}";
+        p = joinPath pfx k;
       in
       if (v._type or "") == "option" then
         acc // { ${p} = optL v; }
       else if isAttrs v then
-        acc // flatLens p v
+        flatLens p acc v
       else
         acc
-    ) { } (attrNames opts);
+    ) acc (attrNames opts);
 
-  # sparse config walk → [{name, value, file, prio}]
+  # walk config attrset → list of Def records
   walkCfg =
     lens: cfg: file:
     let
@@ -89,7 +97,7 @@ let
           map (
             k:
             let
-              p = if pre == "" then k else "${pre}.${k}";
+              p = joinPath pre k;
             in
             if lens ? ${p} then
               [
@@ -109,6 +117,7 @@ let
     in
     go "" cfg;
 
+  # normalise a module (function or attrset)
   norm =
     mkArgs: m:
     let
@@ -130,16 +139,21 @@ in
       ...
     }:
     let
-      cfg = if result ? right then unflatten result.right else { };
+      # All configs known upfront — no DI. Use bend lenses directly (no ned.run).
+      cfg = if merged ? right then unflatten merged.right else { };
       mkArgs = {
         inherit lib;
         config = cfg;
       }
       // specialArgs;
       mods = map (norm mkArgs) modules;
-      lens = foldl' (a: m: a // flatLens "" (m.options)) { } mods;
-      defs = map (m: _: ned.st.fromList (walkCfg lens (m.config) "<mod>")) mods;
-      result = zen.run { inherit lens defs; };
+      lens = foldl' (acc: m: flatLens "" acc (m.options)) { } mods;
+      # Collect all {name;value;file;prio} items from all modules
+      allItems = concatLists (map (m: walkCfg lens (m.config) "<mod>") mods);
+      byOpt = groupBy (item: item.name) allItems;
+      # Apply each lens directly to its list of Def records
+      eithers = mapAttrs (name: l: l.get (byOpt.${name} or [ ])) lens;
+      merged = zen.aggregate eithers;
     in
     {
       config = cfg;
