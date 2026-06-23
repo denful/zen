@@ -55,7 +55,9 @@ Workload: M service modules, K=4 submodule instances each. Each module declares 
 | 133| 798        | 64 703      | 245 695         | **3.8×**     |
 | 300| 1 800      | 145 431     | 477 283         | **3.3×**     |
 
-Both engines are **linear in N**. zen has near-zero fixed base (slope ≈ 76.9 primops/option). nixpkgs pays ~61 000 primops fixed overhead before evaluating any user option (slope ≈ 231.1 primops/option). The fixed base explains the 9.8× advantage at small N; the asymptotic ratio floors at ~3× (slope ratio). **Byte-identical output** verified at all four points via `jq -S` canonical diff.
+Both engines are **linear in N**. zen has near-zero fixed base (slope ≈ 80.6 primops/option). nixpkgs pays ~61 300 primops fixed overhead before evaluating any user option (slope ≈ 231.1 primops/option). The fixed base explains the 9.8× advantage at small N; the asymptotic ratio floors at ~2.9× (slope ratio). **Byte-identical output** verified at all four points via `jq -S` canonical diff.
+
+Repro: `MS="17 50 133 300" KS=4 bash benchmarks/run-realistic-bench.sh` — metric `nrPrimOpCalls`.
 
 ### Benchmark 2: zen nixmod compat — flat-batch, N=10 000 modules
 

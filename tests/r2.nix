@@ -22,6 +22,7 @@ let
     head
     length
     any
+    map
     ;
 in
 {
@@ -131,6 +132,48 @@ in
           errorCount = 2;
           atLeastTwo = true;
           bothPresent = true;
+        };
+      };
+
+    # --- ACCUMULATING-BLAME: three simultaneous, independent faults. ---
+    # ONE module with THREE simultaneous, independent faults:
+    #   * config.a = "bad-a" against options.a = int  → type error on a.
+    #   * config.b = "bad-b" against options.b = int  → type error on b.
+    #   * config.c = 1 with NO options.c              → unknown-option on c.
+    # `collectErrors` folds over `attrNames (eithers // unknowns)` which is
+    # alphabetical/declaration order: a, b, c. All three must appear in
+    # `left.errors` in that exact order. A first-fail or keep-one-only impl
+    # will yield length < 3 and/or wrong order, failing both assertions.
+    test_blame_accumulates_3 =
+      let
+        r = zen.run {
+          modules = [
+            {
+              options.a = zen.opt zen.m.unique zen.t.int;
+              options.b = zen.opt zen.m.unique zen.t.int;
+              config.a = "bad-a";
+              config.b = "bad-b";
+              config.c = 1;
+            }
+          ];
+        };
+        errs = r.left.errors or [ ];
+        orderedPaths = map (e: e.path or null) errs;
+      in
+      {
+        expr = {
+          isLeft = r ? left;
+          errorCount = length errs;
+          orderedPaths = orderedPaths;
+        };
+        expected = {
+          isLeft = true;
+          errorCount = 3;
+          orderedPaths = [
+            "a"
+            "b"
+            "c"
+          ];
         };
       };
 
