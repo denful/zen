@@ -192,6 +192,127 @@ in
       };
     };
 
+    # === test_R7_listOf_submod_positive — composite-field-submod (listOf) =======
+    # A field `deps = listOf (submod { name = str; version = str; })` receives a
+    # valid list element. The `.inner` path on the submod type is exercised by
+    # listOf's element lens (`bend.each (t.inner or t)` — api.nix:197). Without
+    # the `.inner` fix the lens falls through to the full `opt`-wrapped type and
+    # crashes at api.nix:66 (`attribute 'prio' missing`). This test is the
+    # positive oracle: valid data MUST settle to `right` with the value preserved.
+    test_R7_listOf_submod_positive = {
+      expr = zen.run [
+        {
+          options.deps = zen.types.listOf (zen.types.submod {
+            name = zen.types.str;
+            version = zen.types.str;
+          });
+          config.deps = [
+            {
+              name = "d1";
+              version = "1.0";
+            }
+          ];
+        }
+      ];
+      expected = {
+        right = {
+          deps = [
+            {
+              name = "d1";
+              version = "1.0";
+            }
+          ];
+        };
+      };
+    };
+
+    # === test_R7_listOf_submod_neg_wrong_type — negative control A (listOf) ====
+    # Same field; element has `version = 123` (int, not str). The nested element
+    # lens (`submodOf`) MUST reject it: result is `left` with `deps` failing.
+    # Proves the element lens actually fires and validates nested field types,
+    # not a passthrough. If `.inner` were absent the crash at :66 would mask the
+    # type error — this test proves real validation, not a no-op passthrough.
+    test_R7_listOf_submod_neg_wrong_type =
+      let
+        r = zen.run [
+          {
+            options.deps = zen.types.listOf (zen.types.submod {
+              name = zen.types.str;
+              version = zen.types.str;
+            });
+            config.deps = [
+              {
+                name = "d1";
+                version = 123;
+              }
+            ];
+          }
+        ];
+      in
+      {
+        expr = zen.test.fieldError r "deps";
+        expected = true;
+      };
+
+    # === test_R7_listOf_submod_neg_missing_field — negative control B (listOf) ==
+    # Element omits the required `version` field entirely. The submod lens calls
+    # `bend.recordAll` which rejects missing required fields. Result is `left`
+    # with `deps` failing. Paired with neg_wrong_type this proves the full
+    # submod validator (field-presence AND type) fires through the listOf path.
+    test_R7_listOf_submod_neg_missing_field =
+      let
+        r = zen.run [
+          {
+            options.deps = zen.types.listOf (zen.types.submod {
+              name = zen.types.str;
+              version = zen.types.str;
+            });
+            config.deps = [
+              {
+                name = "d1";
+              }
+            ];
+          }
+        ];
+      in
+      {
+        expr = zen.test.fieldError r "deps";
+        expected = true;
+      };
+
+    # === test_R7_attrsOf_submod_positive — composite-field-submod (attrsOf) ====
+    # A field `deps = attrsOf (submod { name = str; version = str; })` receives a
+    # valid attrset of elements. Exercises `bend.eachValue (t.inner or t)` path
+    # (api.nix:203) — the attrsOf parallel of the listOf fix. Valid data MUST
+    # settle to `right` with the value preserved, proving the `.inner` path on
+    # attrsOf also correctly resolves the nested submod lens.
+    test_R7_attrsOf_submod_positive = {
+      expr = zen.run [
+        {
+          options.deps = zen.types.attrsOf (zen.types.submod {
+            name = zen.types.str;
+            version = zen.types.str;
+          });
+          config.deps = {
+            d1 = {
+              name = "d1";
+              version = "1.0";
+            };
+          };
+        }
+      ];
+      expected = {
+        right = {
+          deps = {
+            d1 = {
+              name = "d1";
+              version = "1.0";
+            };
+          };
+        };
+      };
+    };
+
     # === NEGATIVE CONTROL: test_R7_cyclic_reference — spec §5/§10 =============
     # A mutual option reference (config.a = { b }: b; config.b = { a }: a) is an
     # unresolvable cycle. zen-old / a naive actor cycle would HANG; Nix's lazy
