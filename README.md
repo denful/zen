@@ -31,8 +31,7 @@ zen uses [`nix-effects`](https://github.com/kleisli-io/nix-effects) rotation and
 ## Benchmarks Development Environment
 
 ```shell
-nix develop -f ./shell.nix
-just bench
+nix-shell --run 'just bench'
 ```
 
 ## Performance vs `lib.evalModules`
@@ -51,12 +50,12 @@ Workload: M service modules, K=4 submodule instances each. Each module declares 
 
 | M  | N (approx) | zen primops | nixpkgs primops | ratio np/zen |
 |----|------------|-------------|-----------------|--------------|
-| 17 | 102        | 8 272       | 84 832          | **10.3×**    |
-| 50 | 300        | 23 509      | 130 595         | **5.6×**     |
-| 133| 798        | 61 806      | 245 695         | **4.0×**     |
-| 300| 1 800      | 138 898     | 477 283         | **3.4×**     |
+| 17 | 102        | 8 646       | 84 832          | **9.8×**     |
+| 50 | 300        | 24 602      | 130 595         | **5.3×**     |
+| 133| 798        | 64 703      | 245 695         | **3.8×**     |
+| 300| 1 800      | 145 431     | 477 283         | **3.3×**     |
 
-Both engines are **linear in N**. zen has near-zero fixed base (slope ≈ 76.9 primops/option). nixpkgs pays ~61 000 primops fixed overhead before evaluating any user option (slope ≈ 231.1 primops/option). The fixed base explains the 10.3× advantage at small N; the asymptotic ratio floors at ~3× (slope ratio). **Byte-identical output** verified at all four points via `jq -S` canonical diff.
+Both engines are **linear in N**. zen has near-zero fixed base (slope ≈ 76.9 primops/option). nixpkgs pays ~61 000 primops fixed overhead before evaluating any user option (slope ≈ 231.1 primops/option). The fixed base explains the 9.8× advantage at small N; the asymptotic ratio floors at ~3× (slope ratio). **Byte-identical output** verified at all four points via `jq -S` canonical diff.
 
 ### Benchmark 2: zen nixmod compat — flat-batch, N=10 000 modules
 
@@ -69,7 +68,7 @@ ratio: 84×
 Byte-identical output: confirmed
 ```
 
-Honest caveat: the 84× is the flat-batch stress number (no type validation, static `str`/`listOf str`). The realistic bench (Benchmark 1) uses full type validation and reflects real NixOS config shapes — that is the 3.4–10.3× range. On large-N *artificial flat dependency chains* (no module system, pure sequential thunk forcing), nixpkgs' sublinear primop growth eventually overtakes zen's linear growth; on realistic NixOS configs (table above) zen wins at every point measured (N=102–1800).
+Honest caveat: the 84× is the flat-batch stress number (no type validation, static `str`/`listOf str`). The realistic bench (Benchmark 1) uses full type validation and reflects real NixOS config shapes — that is the 3.3–9.8× range. On large-N *artificial flat dependency chains* (no module system, pure sequential thunk forcing), nixpkgs' sublinear primop growth eventually overtakes zen's linear growth; on realistic NixOS configs (table above) zen wins at every point measured (N=102–1800).
 
 zen never calls `evalModules` recursively. nixpkgs creates a new fixed-point per submodule level. zen relies on `ned.scope-d` which uses `nix-effects`' `fx.rotate` to provide scoped handlers with no per-level overhead.
 

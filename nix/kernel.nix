@@ -230,7 +230,22 @@ let
       perKey = foldl' (step srcs) (mapAttrs (_: _: [ ]) lens) defs;
     in
     mapAttrs (
-      _: contribs: if contribs == [ ] then ned.st else ned.st.flatten (ned.st.fromList contribs)
+      _: contribs:
+      if contribs == [ ] then
+        ned.st
+      else
+        # mode E: RIGHT fold of `ned.st.concat` over the contribution streams,
+        # `elems(c0) ++ elems(c1) ++ … ++ []` — identical element sequence to the
+        # former `flatten (fromList contribs)`. Each `acc` is the lazy concat tail
+        # (`fx.stream.concat` defers s2 in a thunk), so head-force descends only
+        # one contribution at a time: O(1) Nix stack at any N (the property the
+        # flatten shape gave, without flatMap's per-element rewrap). Seed `ned.st`
+        # is the empty stream (concat identity), matching the `[]` branch.
+        let
+          n = length contribs;
+          go = i: if i == n then ned.st else (builtins.elemAt contribs i).concat (go (i + 1));
+        in
+        go 0
     ) perKey;
 
   # aggregate :: { <opt> = Either; ... } -> { left | right }

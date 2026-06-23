@@ -14,7 +14,7 @@
     bend.url = "github:denful/bend";
     bend.flake = false;
 
-    nix-effects.url = "github:kleisli-io/nix-effects";
+    nix-effects.url = "github:denful/nix-effects/stream-stack-safe";
     nix-effects.flake = false;
 
     # Bootstrap fetcher used by dev/with-inputs.nix.

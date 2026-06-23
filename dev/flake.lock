@@ -34,11 +34,11 @@
     },
     "ned": {
       "locked": {
-        "lastModified": 1778904359,
-        "narHash": "sha256-4N654WkqPMhOkL64Z6MtnzvdWntiC+7WJ4SsiXV3vDg=",
+        "lastModified": 1782244699,
+        "narHash": "sha256-J/JUlKHNBfZPiB71drgUCiVH9TA6V1al/R5qaOXjdJ8=",
         "owner": "denful",
         "repo": "ned",
-        "rev": "ccbe59153a0d30df2a39c92884a3ab6aa1ebafc2",
+        "rev": "2f6204a1f54257fdfc1cfb85a3a84b51ceae8611",
         "type": "github"
       },
       "original": {
@@ -50,15 +50,16 @@
     "nix-effects": {
       "flake": false,
       "locked": {
-        "lastModified": 1778686186,
-        "narHash": "sha256-oxjrcHFSV2+Rxg4LE4Hupa5HjleTvU1Ir6jp5SburLE=",
-        "owner": "kleisli-io",
+        "lastModified": 1782236537,
+        "narHash": "sha256-GqDnTYvYFi0RkWhMx5Drjg+9uKccKooIBzMotXbVaDo=",
+        "owner": "denful",
         "repo": "nix-effects",
-        "rev": "c3c68a45deb892d028711eeff8b80937e30a90dd",
+        "rev": "e8a162d72eb2e21ffaa0d307e651cdbed551c450",
         "type": "github"
       },
       "original": {
-        "owner": "kleisli-io",
+        "owner": "denful",
+        "ref": "stream-stack-safe",
         "repo": "nix-effects",
         "type": "github"
       }
