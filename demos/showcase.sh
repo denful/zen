@@ -9,8 +9,8 @@ set -uo pipefail
 
 ACT="${1:-all}"
 case "$ACT" in
-  all|blame|cycle|actor|behaviour|deptype|pitype) ;;
-  *) printf 'unknown demo: %s\n  valid: blame cycle actor behaviour deptype pitype all\n' "$ACT" >&2; exit 1 ;;
+  all|blame|partial|cycle|recover|actor|behaviour|deptype|pitype) ;;
+  *) printf 'unknown demo: %s\n  valid: blame partial cycle recover actor behaviour deptype pitype all\n' "$ACT" >&2; exit 1 ;;
 esac
 want() { [ "$ACT" = "all" ] || [ "$ACT" = "$1" ]; }
 
@@ -146,10 +146,57 @@ pause 0.6
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ACT 2 — CYCLES ARE DATA (located cycle)
+# ACT 2 — PARTIAL CONFIG: one bad option ≠ total loss
+# ═══════════════════════════════════════════════════════════════════════════════
+if want partial; then
+title_box "ACT 2 — PARTIAL CONFIG: one bad option ≠ total loss" "Six options, one wrong-typed."
+
+printf "  nixpkgs: forcing the config aborts on the bad option — the good ones never return. Deploy NOTHING.\n"
+printf "  dzm:     every option settles independently — bad = located left, good = settled values.\n\n"
+
+pause 0.4
+
+printf "  ${BOLD}── nixpkgs ──${RESET}\n"
+capture "$DEMOS_DIR/partial/nixpkgs-side.nix"
+printf "  ${RED_X} nixpkgs: ABORTS exit=${RC}${RESET}\n"
+excerpt=$(printf '%s\n' "$OUT" | grep -E 'not of type|error:' | head -1 | sed 's/^/       /')
+if [ -n "$excerpt" ]; then
+  printf '%s\n' "$excerpt"
+fi
+printf "  the good 'host' is never reachable — one throw sinks the whole config.\n"
+
+pause 0.4
+printf '\n'
+printf "  ${BOLD}── dzm ──${RESET}\n"
+capture_json "$DEMOS_DIR/partial/dzm-side.nix"
+printf "  ${GREEN_OK} dzm: clean${RESET}\n"
+if command -v jq &>/dev/null && [ -n "${JSON:-}" ]; then
+  located=$(printf '%s\n' "$JSON" | jq -r '.located_failure[0] | "  located failure:  \(.path) → why=\(.why), got=\(.got)"' 2>/dev/null || true)
+  surviving=$(printf '%s\n' "$JSON" | jq -r '.surviving | "  surviving good:   " + (to_entries | map("\(.key)=\(.value)") | join(" · "))' 2>/dev/null || true)
+  if [ -n "$located" ]; then
+    printf '%s\n' "$located"
+  fi
+  if [ -n "$surviving" ]; then
+    printf '%s\n' "$surviving"
+  fi
+else
+  printf '  result (raw): %s\n' "${JSON:-}"
+fi
+
+pause 0.4
+printf '\n'
+printf "  ${DIM}→ The bad option is quarantined as a located left; the other five are settled values${RESET}\n"
+printf "  ${DIM}  you can serialize + deploy now. (dzm gives you the good config as DATA —${RESET}\n"
+printf "  ${DIM}  turning it into a booted system is downstream.)${RESET}\n"
+
+pause 0.6
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ACT 3 — CYCLES ARE DATA (located cycle)
 # ═══════════════════════════════════════════════════════════════════════════════
 if want cycle; then
-title_box "ACT 2 — CYCLES ARE DATA" "Mutual option reference a <-> b."
+title_box "ACT 3 — CYCLES ARE DATA" "Mutual option reference a <-> b."
 
 printf "  nixpkgs: engine death — unlocated, uncatchable.\n"
 printf "  dzm:     Kahn topo-sort → located cycle as data, exit=0.\n\n"
@@ -176,10 +223,61 @@ pause 0.6
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ACT 3 — MODULES ARE ACTORS (running-total, STEPPED REVEAL)
+# ACT 4 — RECOVER: conflicts resolve and RESUME
+# ═══════════════════════════════════════════════════════════════════════════════
+if want recover; then
+title_box "ACT 4 — RECOVER: conflicts resolve and RESUME" "port defined twice: 8080 vs 9090."
+
+printf "  nixpkgs: two definitions for one option → 'conflicting definition values' → fatal, no recovery.\n"
+printf "  dzm:     the conflict signals a condition; a resolver restart RESUMES settlement.\n\n"
+
+pause 0.4
+
+printf "  ${BOLD}── nixpkgs ──${RESET}\n"
+capture "$DEMOS_DIR/recover/nixpkgs-side.nix"
+printf "  ${RED_X} nixpkgs: ABORTS exit=${RC}${RESET}\n"
+excerpt=$(printf '%s\n' "$OUT" | grep -E 'conflicting definition' | head -2 | sed 's/^/       /')
+if [ -n "$excerpt" ]; then
+  printf '%s\n' "$excerpt"
+fi
+
+pause 0.4
+printf '\n'
+printf "  ${BOLD}── dzm ── (SAME config, swap the resolver)${RESET}\n"
+capture_json "$DEMOS_DIR/recover/dzm-side.nix"
+printf "  ${GREEN_OK} dzm: clean${RESET}\n"
+if command -v jq &>/dev/null && [ -n "${JSON:-}" ]; then
+  usefirst=$(printf '%s\n' "$JSON" | jq -r '"  handler = useFirst  ⟹ ✓ resumes → port=\(.useFirst.right.port), host=\(.useFirst.right.host)"' 2>/dev/null || true)
+  uselast=$(printf '%s\n' "$JSON" | jq -r '"  handler = useLast   ⟹ ✓ resumes → port=\(.useLast.right.port), host=\(.useLast.right.host)"' 2>/dev/null || true)
+  rejectr=$(printf '%s\n' "$JSON" | jq -r '"  handler = reject    ⟹ ✗ located left {why=\(.reject.left.errors[0].why)} — host still settles (\(.reject.left.host.right))"' 2>/dev/null || true)
+  if [ -n "$usefirst" ]; then
+    printf "${GREEN}%s${RESET}\n" "$usefirst"
+  fi
+  if [ -n "$uselast" ]; then
+    printf "${GREEN}%s${RESET}\n" "$uselast"
+  fi
+  if [ -n "$rejectr" ]; then
+    printf "${RED}%s${RESET}\n" "$rejectr"
+  fi
+else
+  printf '  result (raw): %s\n' "${JSON:-}"
+fi
+
+pause 0.4
+printf '\n'
+printf "  ${DIM}→ A Common-Lisp-style condition/restart: settlement pauses at the conflict,${RESET}\n"
+printf "  ${DIM}  the handler picks the restart, evaluation RESUMES past it. Nix's throw model${RESET}\n"
+printf "  ${DIM}  has no recovery point — one conflict aborts everything.${RESET}\n"
+printf "  ${DIM}  Same config, three outcomes, chosen by the handler.${RESET}\n"
+
+pause 0.6
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ACT 5 — MODULES ARE ACTORS (running-total, STEPPED REVEAL)
 # ═══════════════════════════════════════════════════════════════════════════════
 if want actor; then
-title_box "ACT 3 — MODULES ARE ACTORS" "Running-total: send [10, 20, 30]."
+title_box "ACT 5 — MODULES ARE ACTORS" "Running-total: send [10, 20, 30]."
 
 printf "  nixpkgs: builtins.foldl' → final total only, no per-step states.\n"
 printf "  dzm:     typed dnzl actor (reply+become) → every cumulative state.\n\n"
@@ -235,10 +333,10 @@ pause 0.6
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ACT 4 — BEHAVIOUR SHAPE-FLIP (actor become at the config level)
+# ACT 6 — BEHAVIOUR SHAPE-FLIP (actor become at the config level)
 # ═══════════════════════════════════════════════════════════════════════════════
 if want behaviour; then
-title_box "ACT 4 — BEHAVIOUR SHAPE-FLIP" "enable's VALUE flips the accepted option SHAPE."
+title_box "ACT 6 — BEHAVIOUR SHAPE-FLIP" "enable's VALUE flips the accepted option SHAPE."
 
 printf "  nixpkgs: config-dependent declaration → infinite recursion.\n"
 printf "  dzm:     fx Σ + large elimination → shape flips, errors located.\n\n"
@@ -295,10 +393,10 @@ pause 0.6
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ACT 5 — DEPENDENT TYPE: the TYPE computed from a VALUE (Vector n)
+# ACT 7 — DEPENDENT TYPE: the TYPE computed from a VALUE (Vector n)
 # ═══════════════════════════════════════════════════════════════════════════════
 if want deptype; then
-title_box "ACT 5 — DEPENDENT TYPE: items :: Vector n" "The type of items is a function of n's VALUE."
+title_box "ACT 7 — DEPENDENT TYPE: items :: Vector n" "The type of items is a function of n's VALUE."
 
 printf "  nixpkgs: structural inability — a module \`type\` is resolved BEFORE\n"
 printf "  any option value is known; no seam where one option's resolved value\n"
@@ -344,10 +442,10 @@ pause 0.6
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ACT 6 — DEPENDENT FUNCTION: Π-type (domain + return-type-from-input)
+# ACT 8 — DEPENDENT FUNCTION: Π-type (domain + return-type-from-input)
 # ═══════════════════════════════════════════════════════════════════════════════
 if want pitype; then
-title_box "ACT 6 — Π-TYPE: DEPENDENT FUNCTION" "Π(x:A).B(x): domain checked + codomain depends on input."
+title_box "ACT 8 — Π-TYPE: DEPENDENT FUNCTION" "Π(x:A).B(x): domain checked + codomain depends on input."
 
 printf "  nixpkgs: \`lib.types.functionTo\` carries ONLY the codomain (checks\n"
 printf "  results); it has NO slot for the DOMAIN and cannot make the return\n"
@@ -416,7 +514,9 @@ printf '\n'
 printf "  ${BOLD}%-28s  %-22s  %-22s${RESET}\n" "Scenario" "nixpkgs" "dzm"
 printf "  %s\n" "$(printf '%0.s─' {1..76})"
 printf "  %-28s  %-22s  %-22s\n" "blame (2 type errors)"   "ABORTS on 1st"           "ALL errors returned"
+printf "  %-28s  %-22s  %-22s\n" "partial (1 bad of 6)"    "aborts all"               "settles good 5"
 printf "  %-28s  %-22s  %-22s\n" "cycle (a <-> b)"         "infinite recursion"       "located {why=cycle}"
+printf "  %-28s  %-22s  %-22s\n" "recover (port 8080/9090)" "throws+dies"             "resolves+RESUMES 3 ways"
 printf "  %-28s  %-22s  %-22s\n" "actor ([10,20,30])"      "final=60 only"            "totals=[10,30,60]"
 printf "  %-28s  %-22s  %-22s\n" "behaviour shape-flip"    "infinite recursion"       "LOCATED shape verdict"
 printf "  %-28s  %-22s  %-22s\n" "dependent type (Vector n)" "structurally blocked"   "items:Vector n live"
