@@ -26,6 +26,24 @@ The kernel is ~100 lines. Everything built on top — types, merge strategies, s
 
 ---
 
+## TL;DR — try it
+
+```sh
+just demo        # narrated showcase: 14 side-by-side acts — nixpkgs aborts ✗  vs  zen located-as-data ✓
+just demo mesh   # run a single act by name (see list below)
+just demos       # terse side-by-side batch (demos/run.sh)
+just bench       # interaction-count benchmarks vs lib.evalModules (nrPrimOpCalls)
+just test        # the 137-test suite (nix-unit)
+```
+
+`just demo` is the fastest way to see what zen does that `lib.evalModules` structurally cannot — errors, cycles, conflicts, behaviours, dependent types, and capability discovery become inspectable **data**. The 14 acts, simplest → most interesting:
+
+`blame` · `partial` · `cycle` · `recover` · `policy` · `actor` · `behaviour` · `deptype` · `pitype` · `discovery` · `refined` · `deprecord` · `crossfield` · `mesh`
+
+Run one with `just demo <name>` (e.g. `just demo discovery`, `just demo mesh`).
+
+---
+
 ## Why different: the structural gap vs nixpkgs
 
 nixpkgs evaluates via a lazy fixpoint with uncatchable `throw`. A single bad option aborts the entire evaluation. A circular dependency yields `"infinite recursion encountered"` — no location, no path, no recovery. Its type system cannot express a type that depends on a value, because the fixpoint has no memory of what came before.
