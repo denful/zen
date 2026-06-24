@@ -20,3 +20,11 @@ test suite="all" *args:
 bench runs="10" warmup="3":
   cd benchmarks && RUNS={{runs}} WARMUP={{warmup}} ./bench.sh
 
+# narrated investor showcase — all acts (`just demo`) or one (`just demo actor`)
+demo act="all":
+  ./demos/showcase.sh {{act}}
+
+# terse side-by-side demos, nixpkgs vs dzm, no narration (`just demos`)
+demos:
+  ./demos/run.sh
+

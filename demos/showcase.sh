@@ -7,6 +7,13 @@
 # nixpkgs abort (exit≠0) never kills this script. set -uo pipefail (NOT -e).
 set -uo pipefail
 
+ACT="${1:-all}"
+case "$ACT" in
+  all|blame|cycle|actor|behaviour|deptype|pitype) ;;
+  *) printf 'unknown demo: %s\n  valid: blame cycle actor behaviour deptype pitype all\n' "$ACT" >&2; exit 1 ;;
+esac
+want() { [ "$ACT" = "all" ] || [ "$ACT" = "$1" ]; }
+
 DEMOS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── ANSI color helpers (guarded: only when stdout is a terminal) ─────────────
@@ -110,6 +117,7 @@ pause 0.6
 # ═══════════════════════════════════════════════════════════════════════════════
 # ACT 1 — ERRORS ARE DATA (accumulating blame)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want blame; then
 title_box "ACT 1 — ERRORS ARE DATA" "Two type faults in the same config."
 
 printf "  nixpkgs: aborts on fault #1, never surfaces fault #2.\n"
@@ -135,10 +143,12 @@ printf "  ${DIM}→ nixpkgs aborts on fault #1, never sees #2.${RESET}\n"
 printf "  ${DIM}  dzm returns ALL located errors at once.${RESET}\n"
 
 pause 0.6
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ACT 2 — CYCLES ARE DATA (located cycle)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want cycle; then
 title_box "ACT 2 — CYCLES ARE DATA" "Mutual option reference a <-> b."
 
 printf "  nixpkgs: engine death — unlocated, uncatchable.\n"
@@ -163,10 +173,12 @@ printf "  ${DIM}→ nixpkgs: engine death, no location.${RESET}\n"
 printf "  ${DIM}  dzm: Kahn topo-sort → located cycle as data.${RESET}\n"
 
 pause 0.6
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ACT 3 — MODULES ARE ACTORS (running-total, STEPPED REVEAL)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want actor; then
 title_box "ACT 3 — MODULES ARE ACTORS" "Running-total: send [10, 20, 30]."
 
 printf "  nixpkgs: builtins.foldl' → final total only, no per-step states.\n"
@@ -220,10 +232,12 @@ printf "  ${DIM}→ A fixpoint cannot represent 'handler changes over a stream.'
 printf "  ${DIM}  The actor genuinely becomes its next state per message.${RESET}\n"
 
 pause 0.6
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ACT 4 — BEHAVIOUR SHAPE-FLIP (actor become at the config level)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want behaviour; then
 title_box "ACT 4 — BEHAVIOUR SHAPE-FLIP" "enable's VALUE flips the accepted option SHAPE."
 
 printf "  nixpkgs: config-dependent declaration → infinite recursion.\n"
@@ -278,10 +292,12 @@ printf "  ${DIM}  the SAME reason as nixpkgs's lazy fixpoint. The win vs nixpkgs
 printf "  ${DIM}  is LOCATED-not-silent, not options-vanish.${RESET}\n"
 
 pause 0.6
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ACT 5 — DEPENDENT TYPE: the TYPE computed from a VALUE (Vector n)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want deptype; then
 title_box "ACT 5 — DEPENDENT TYPE: items :: Vector n" "The type of items is a function of n's VALUE."
 
 printf "  nixpkgs: structural inability — a module \`type\` is resolved BEFORE\n"
@@ -325,10 +341,12 @@ printf "  ${DIM}  The TYPE of \`items\` is a function of n's VALUE (\`Vector n\`
 printf "  ${DIM}  Martin-Löf dependent types in a config language.${RESET}\n"
 
 pause 0.6
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ACT 6 — DEPENDENT FUNCTION: Π-type (domain + return-type-from-input)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want pitype; then
 title_box "ACT 6 — Π-TYPE: DEPENDENT FUNCTION" "Π(x:A).B(x): domain checked + codomain depends on input."
 
 printf "  nixpkgs: \`lib.types.functionTo\` carries ONLY the codomain (checks\n"
@@ -385,10 +403,12 @@ printf "  ${DIM}  arg — functionTo can't) AND a codomain that DEPENDS on the i
 printf "  ${DIM}  value.${RESET}\n"
 
 pause 0.6
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CLOSING BOX — summary table + honest scope
 # ═══════════════════════════════════════════════════════════════════════════════
+if [ "$ACT" = "all" ]; then
 sep
 printf '\n'
 printf "  ${BOLD}SUMMARY — nixpkgs vs dzm${RESET}\n"
@@ -409,3 +429,4 @@ printf "  ${DIM}Whole suite: 137/137 green.${RESET}\n"
 printf '\n'
 sep
 printf '\n'
+fi
