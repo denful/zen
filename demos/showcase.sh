@@ -9,8 +9,8 @@ set -uo pipefail
 
 ACT="${1:-all}"
 case "$ACT" in
-  all|blame|partial|cycle|recover|actor|behaviour|deptype|pitype) ;;
-  *) printf 'unknown demo: %s\n  valid: blame partial cycle recover actor behaviour deptype pitype all\n' "$ACT" >&2; exit 1 ;;
+  all|blame|partial|cycle|recover|policy|actor|behaviour|deptype|pitype) ;;
+  *) printf 'unknown demo: %s\n  valid: blame partial cycle recover policy actor behaviour deptype pitype all\n' "$ACT" >&2; exit 1 ;;
 esac
 want() { [ "$ACT" = "all" ] || [ "$ACT" = "$1" ]; }
 
@@ -132,10 +132,14 @@ pause 0.4
 
 printf '\n'
 printf "  ${BOLD}── dzm ──${RESET}\n"
-capture "$DEMOS_DIR/blame/dzm-side.nix"
+capture_json "$DEMOS_DIR/blame/dzm-side.nix"
 dzm_ok
-# Print raw $OUT: contains both faults in left.errors
-printf '  result: %s\n' "$OUT"
+# Print ALL located errors (JSON array of {path,got,why})
+if command -v jq &>/dev/null && [ -n "${JSON:-}" ]; then
+  printf '%s\n' "$JSON" | jq -r '.[] | "  { path=\(.path), got=\(.got), why=\(.why) }"' 2>/dev/null || printf '  result: %s\n' "$JSON"
+else
+  printf '  result: %s\n' "${JSON:-}"
+fi
 
 pause 0.4
 printf '\n'
@@ -274,10 +278,61 @@ pause 0.6
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ACT 5 — MODULES ARE ACTORS (running-total, STEPPED REVEAL)
+# ACT 5 — POLICY: same config, swap the failure handler
+# ═══════════════════════════════════════════════════════════════════════════════
+if want policy; then
+title_box "ACT 5 — POLICY: same config, swap the failure handler" "Two bad options; the handler decides what happens."
+
+printf "  nixpkgs: one hardcoded policy — throw. No warn-and-continue, no collect-all, no per-eval swap.\n"
+printf "  dzm: the SAME config settled under different handlers — fail-loud or degrade-gracefully.\n\n"
+
+pause 0.4
+
+printf "  ${BOLD}── nixpkgs ──${RESET}\n"
+capture "$DEMOS_DIR/policy/nixpkgs-side.nix"
+printf "  ${RED_X} nixpkgs: ABORTS exit=${RC}${RESET}\n"
+excerpt=$(printf '%s\n' "$OUT" | grep -E 'not of type' | head -1 | sed 's/^/       /')
+if [ -n "$excerpt" ]; then
+  printf '%s\n' "$excerpt"
+fi
+
+pause 0.4
+printf '\n'
+printf "  ${BOLD}── dzm ──${RESET}\n"
+capture_json "$DEMOS_DIR/policy/dzm-side.nix"
+printf "  ${GREEN_OK} dzm: clean${RESET}\n"
+if command -v jq &>/dev/null && [ -n "${JSON:-}" ]; then
+  col_paths=$(printf '%s\n' "$JSON" | jq -r '.collecting.left.errors[].path' 2>/dev/null | tr '\n' ' ' | sed 's/ $//' || true)
+  warn_port=$(printf '%s\n' "$JSON" | jq -r '.warnContinue.right.port' 2>/dev/null || true)
+  warn_workers=$(printf '%s\n' "$JSON" | jq -r '.warnContinue.right.workers' 2>/dev/null || true)
+  warn_host=$(printf '%s\n' "$JSON" | jq -r '.warnContinue.right.host' 2>/dev/null || true)
+  if [ -n "$col_paths" ]; then
+    printf "  collecting → located errors: %s (config rejected, all faults shown)\n" "$col_paths"
+  fi
+  pause 0.4
+  if [ -n "$warn_port" ] && [ -n "$warn_host" ]; then
+    printf "  warn-continue → settled: port=%s, workers=%s, host=%s (degraded, no abort)\n" \
+      "$warn_port" "$warn_workers" "$warn_host"
+  fi
+else
+  printf '  result (raw): %s\n' "${JSON:-}"
+fi
+
+pause 0.4
+printf '\n'
+printf "  ${DIM}→ The handler IS the policy: same config, swap the interpreter — fail-loud${RESET}\n"
+printf "  ${DIM}  (collect every error) or degrade-gracefully (fall back + continue).${RESET}\n"
+printf "  ${DIM}  nixpkgs bakes one throw policy into the type. (A richer handler can use${RESET}\n"
+printf "  ${DIM}  each option's declared default — follow-up.)${RESET}\n"
+
+pause 0.6
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ACT 6 — MODULES ARE ACTORS (running-total, STEPPED REVEAL)
 # ═══════════════════════════════════════════════════════════════════════════════
 if want actor; then
-title_box "ACT 5 — MODULES ARE ACTORS" "Running-total: send [10, 20, 30]."
+title_box "ACT 6 — MODULES ARE ACTORS" "Running-total: send [10, 20, 30]."
 
 printf "  nixpkgs: builtins.foldl' → final total only, no per-step states.\n"
 printf "  dzm:     typed dnzl actor (reply+become) → every cumulative state.\n\n"
@@ -333,10 +388,10 @@ pause 0.6
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ACT 6 — BEHAVIOUR SHAPE-FLIP (actor become at the config level)
+# ACT 7 — BEHAVIOUR SHAPE-FLIP (actor become at the config level)
 # ═══════════════════════════════════════════════════════════════════════════════
 if want behaviour; then
-title_box "ACT 6 — BEHAVIOUR SHAPE-FLIP" "enable's VALUE flips the accepted option SHAPE."
+title_box "ACT 7 — BEHAVIOUR SHAPE-FLIP" "enable's VALUE flips the accepted option SHAPE."
 
 printf "  nixpkgs: config-dependent declaration → infinite recursion.\n"
 printf "  dzm:     fx Σ + large elimination → shape flips, errors located.\n\n"
@@ -393,10 +448,10 @@ pause 0.6
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ACT 7 — DEPENDENT TYPE: the TYPE computed from a VALUE (Vector n)
+# ACT 8 — DEPENDENT TYPE: the TYPE computed from a VALUE (Vector n)
 # ═══════════════════════════════════════════════════════════════════════════════
 if want deptype; then
-title_box "ACT 7 — DEPENDENT TYPE: items :: Vector n" "The type of items is a function of n's VALUE."
+title_box "ACT 8 — DEPENDENT TYPE: items :: Vector n" "The type of items is a function of n's VALUE."
 
 printf "  nixpkgs: structural inability — a module \`type\` is resolved BEFORE\n"
 printf "  any option value is known; no seam where one option's resolved value\n"
@@ -442,10 +497,10 @@ pause 0.6
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ACT 8 — DEPENDENT FUNCTION: Π-type (domain + return-type-from-input)
+# ACT 9 — DEPENDENT FUNCTION: Π-type (domain + return-type-from-input)
 # ═══════════════════════════════════════════════════════════════════════════════
 if want pitype; then
-title_box "ACT 8 — Π-TYPE: DEPENDENT FUNCTION" "Π(x:A).B(x): domain checked + codomain depends on input."
+title_box "ACT 9 — Π-TYPE: DEPENDENT FUNCTION" "Π(x:A).B(x): domain checked + codomain depends on input."
 
 printf "  nixpkgs: \`lib.types.functionTo\` carries ONLY the codomain (checks\n"
 printf "  results); it has NO slot for the DOMAIN and cannot make the return\n"
@@ -517,6 +572,7 @@ printf "  %-28s  %-22s  %-22s\n" "blame (2 type errors)"   "ABORTS on 1st"      
 printf "  %-28s  %-22s  %-22s\n" "partial (1 bad of 6)"    "aborts all"               "settles good 5"
 printf "  %-28s  %-22s  %-22s\n" "cycle (a <-> b)"         "infinite recursion"       "located {why=cycle}"
 printf "  %-28s  %-22s  %-22s\n" "recover (port 8080/9090)" "throws+dies"             "resolves+RESUMES 3 ways"
+printf "  %-28s  %-22s  %-22s\n" "policy (2 bad options)"  "one throw policy only"    "swap handler = swap policy"
 printf "  %-28s  %-22s  %-22s\n" "actor ([10,20,30])"      "final=60 only"            "totals=[10,30,60]"
 printf "  %-28s  %-22s  %-22s\n" "behaviour shape-flip"    "infinite recursion"       "LOCATED shape verdict"
 printf "  %-28s  %-22s  %-22s\n" "dependent type (Vector n)" "structurally blocked"   "items:Vector n live"

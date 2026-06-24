@@ -98,10 +98,19 @@ let
           r = lens.get s;
         in
         if r ? left && !(structured r.left) then
-          bend.left {
+          # SIGNAL the scalar type rejection as an interceptable `typeCheck`
+          # effect (mirroring merge.nix's `conflict`: `fx.bind (signal…) (r:
+          # fx.pure r.value)`). The DEFAULT handler (kernel.defaultHandlers)
+          # resumes with the SAME plain `left { why="type"; got; }` the code
+          # returned before, so default behaviour is byte-identical; a caller's
+          # `handlers.typeCheck` can now intercept and resume with its own value.
+          # `fx.send` is the raw freer primitive `conditions.signal` is built on,
+          # called with the distinct effect name `"typeCheck"` so the handler key
+          # is `typeCheck` (handlersFromAttrs maps handler key == effect name).
+          zen.fx.bind (zen.fx.send "typeCheck" {
             why = "type";
             got = r.left;
-          }
+          }) (resp: zen.fx.pure resp.value)
         else
           r;
       set = lens.set;

@@ -214,6 +214,21 @@ let
           };
         };
       };
+    # Default `typeCheck` handler: resume with the SAME plain `left { why; got; }`
+    # the `typed` lens (api.nix) returned before this became an effect — so the
+    # default path (no caller `handlers.typeCheck`) is byte-identical to before.
+    # `param` IS the signalled `{ why = "type"; got; }` record (raw `fx.send`,
+    # not wrapped like `conditions.signal`'s `{name;data;}`), so it is read
+    # directly. The continuation `(resp: fx.pure resp.value)` reads `.value`, so
+    # the resumed left is carried under `value` (mirroring merge.nix `r.value`).
+    typeCheck =
+      { param, state }:
+      {
+        inherit state;
+        resume = {
+          value = bend.left { inherit (param) why got; };
+        };
+      };
   };
 
   # cycle folds every def into a per-key list of contribution streams (key set
