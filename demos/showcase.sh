@@ -9,8 +9,8 @@ set -uo pipefail
 
 ACT="${1:-all}"
 case "$ACT" in
-  all|blame|partial|cycle|recover|policy|actor|behaviour|deptype|pitype|discovery|refined|deprecord|crossfield) ;;
-  *) printf 'unknown demo: %s\n  valid: blame partial cycle recover policy actor behaviour deptype pitype discovery refined deprecord crossfield all\n' "$ACT" >&2; exit 1 ;;
+  all|blame|partial|cycle|recover|policy|actor|behaviour|deptype|pitype|discovery|refined|deprecord|crossfield|mesh) ;;
+  *) printf 'unknown demo: %s\n  valid: blame partial cycle recover policy actor behaviour deptype pitype discovery refined deprecord crossfield mesh all\n' "$ACT" >&2; exit 1 ;;
 esac
 want() { [ "$ACT" = "all" ] || [ "$ACT" = "$1" ]; }
 
@@ -755,6 +755,54 @@ pause 0.6
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# ACT 14 — MESH: resolve the conflict, then PROVE the resolution
+# ═══════════════════════════════════════════════════════════════════════════════
+if want mesh; then
+title_box "ACT 14 — MESH: resolve the conflict, then PROVE the resolution" \
+  "Two modules claim n (8080 vs 9090); a handler negotiates; a dependent type checks the result."
+
+printf "  nixpkgs: conflicting definitions → throws and dies — no resolution, no proof.\n"
+printf "  dzm: a handler NEGOTIATES the conflict AND a dependent type PROVES the negotiated value satisfies the invariant — in one settle.\n\n"
+
+pause 0.4
+
+printf "  ${BOLD}── nixpkgs ──${RESET}\n"
+capture_json "$DEMOS_DIR/mesh/nixpkgs-side.nix"
+if command -v jq &>/dev/null && [ -n "${JSON:-}" ]; then
+  nx_note=$(printf '%s\n' "$JSON" | jq -r '.note' 2>/dev/null || true)
+  printf "  ${RED_X} nixpkgs: %s (conflict throws, no proof)${RESET}\n" "$nx_note"
+else
+  printf '  result (raw): %s\n' "${JSON:-}"
+fi
+
+pause 0.4
+printf '\n'
+printf "  ${BOLD}── dzm ── (negotiate, then prove)${RESET}\n"
+capture_json "$DEMOS_DIR/mesh/dzm-side.nix"
+printf "  ${GREEN_OK} dzm: clean${RESET}\n"
+if command -v jq &>/dev/null && [ -n "${JSON:-}" ]; then
+  good_line=$(printf '%s\n' "$JSON" | jq -r \
+    '"  ✓ good resolver → n negotiated to \(.good.negotiated.n), slots : Vector \(.good.negotiated.n) holds → right (resolved AND proven)"' \
+    2>/dev/null || true)
+  bad_line=$(printf '%s\n' "$JSON" | jq -r \
+    '"  ✗ bad resolver  → n=\(.bad.blame.indexValue), slots length 2 → located left {why=\(.bad.blame.why), expected=\(.bad.blame.expected)} — the proof caught the bad resolution"' \
+    2>/dev/null || true)
+  printf "  ${GREEN}%s${RESET}\n" "${good_line#  }"
+  printf "  ${RED}%s${RESET}\n"  "${bad_line#  }"
+else
+  printf '  result (raw): %s\n' "${JSON:-}"
+fi
+
+pause 0.4
+printf '\n'
+printf "  ${DIM}→ The conflict is resolved by a handler, and a dependent type PROVES the negotiated config is internally consistent — in ONE settle.${RESET}\n"
+printf "  ${DIM}  nixpkgs throws on the conflict and never reaches a proof.${RESET}\n"
+printf "  ${DIM}  (Non-vacuous: a bad resolution is rejected by the type.)${RESET}\n"
+
+pause 0.6
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # CLOSING BOX — summary table + honest scope
 # ═══════════════════════════════════════════════════════════════════════════════
 if [ "$ACT" = "all" ]; then
@@ -777,6 +825,7 @@ printf "  %-28s  %-22s  %-22s\n" "discovery (client finds \"cache\")" "hardcodes
 printf "  %-28s  %-22s  %-22s\n" "refined (Port 1024-65535)"     "thrown string, name buried" "named type as data"
 printf "  %-28s  %-22s  %-22s\n" "deprecord (kind→addr type)"    "fixed type, assertion only" "addr type = f(kind value)"
 printf "  %-28s  %-22s  %-22s\n" "crossfield (tcp⇒port>1024)"   "unstructured throw, no locus" "located fields+constraint"
+printf "  %-28s  %-22s  %-22s\n" "mesh (negotiate + prove)"     "throws, dies (no proof)"      "resolves AND proves, 1 settle"
 printf '\n'
 printf "  ${DIM}Honest scope: Capabilities nixpkgs lib.evalModules structurally${RESET}\n"
 printf "  ${DIM}cannot reach. Raw perf is secondary (the story is expressiveness${RESET}\n"
