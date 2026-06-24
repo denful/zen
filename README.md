@@ -4,15 +4,15 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/denful/zen" alt="License"/></a>
 </p>
 
-<!-- TODO confirm repo URL -->
-
 > [!WARNING]
 >
 > zen is currently experimental and research-grade. The architecture and design principles are well established and the minimal kernel works, but there is still substantial UX work ahead before production use.
 >
 > zen's nixpkgs compatibility layer (`zen.nixmod.evalModules`) is not intended to be a drop-in replacement for `lib.evalModules`. It was built to verify that zen modules evaluate to the same output as nixpkgs would — byte-identical for `str` and `listOf str` — not as a complete compatibility shim for all nixpkgs module features.
 
-# zen — a minimal stream-based Nix module system
+# zen — a configuration/module system on an actor + algebraic-effects substrate
+
+zen is an alternative for `lib.evalModules`, rebuilt on an actor and algebraic-effects (`fx`) substrate. Evaluation stays inside an effect world. Errors, cycles, types, and behaviours become inspectable **data** — not fatal aborts.
 
 zen is a thin kernel built on three hard dependencies:
 
@@ -24,25 +24,43 @@ zen is a thin kernel built on three hard dependencies:
 
 The kernel is ~100 lines. Everything built on top — types, merge strategies, submodules, import trees — uses the same primitives the caller already has.
 
-zen uses [`nix-effects`](https://github.com/kleisli-io/nix-effects) rotation and scoped handlers to achieve submodules and provide the config fixed-point via Ned streams. This unlocks advanced capabilities that no other Nix module system has: **actor-like inter-module communication**, **negotiated merge**, **stateful reconciliation**, and **MLTT-verified configs**.
+---
+
+## Why different: the structural gap vs nixpkgs
+
+nixpkgs evaluates via a lazy fixpoint with uncatchable `throw`. A single bad option aborts the entire evaluation. A circular dependency yields `"infinite recursion encountered"` — no location, no path, no recovery. Its type system cannot express a type that depends on a value, because the fixpoint has no memory of what came before.
+
+zen keeps evaluation inside an effect world — bend lenses + nix-effects handlers + a static Kahn pre-pass. Every option settles to its own `Either`. Errors, cycles, and behaviours are data that can be inspected, accumulated, and routed. Modules are actors: their handler can change per message. A fixpoint categorically cannot represent that.
 
 ---
 
-## Benchmarks Development Environment
+## Capabilities vs nixpkgs lib.evalModules
 
-```shell
-nix-shell --run 'just bench'
-```
+| Capability | nixpkgs | zen |
+|---|---|---|
+| **Accumulating errors** | Aborts on first bad option | Returns ALL errors, each located `{path, why}` |
+| **Cycle detection** | `"infinite recursion encountered"` (unlocated engine death) | Located cycle report `{why="cycle"; cycle=["a","b"]}` via static Kahn pre-pass |
+| **Actor behaviour** | No message primitives | Modules are actors (`inbox.scanl step`); handler can swap per message (`become`) |
+| **Σ types (dependent records)** | Cannot express | Real MLTT — a vector whose length is another field's value |
+| **Π types (dependent functions)** | `functionTo` carries return type only; cannot state the domain | Real MLTT Pi — domain-checked + return type computed from the input value |
+| **Behaviour-shape flip** | `mkIf` only gates values, never option shapes; shape-dependent declaration → infinite recursion | `zen.depshape`: enable flips accepted shape; present-when-must-be-absent → located `left{why="behaviour-shape"}` |
+| **Negotiated merge** | Two conflicting `mkForce` entries → silent conflict | `zen.m.conflict` + handler picks restart; error is recoverable |
+| **No `throw` in kernel** | `throw` is the error mechanism | Zero `throw` anywhere in the kernel |
+
+Runnable side-by-side demos in `demos/` (`bash demos/run.sh`) — nixpkgs-aborts vs zen-clean, for each capability above.
+
+---
 
 ## Performance vs `lib.evalModules`
 
 > [!NOTE]
-> All benchmarks measure `nrPrimOpCalls` from `NIX_SHOW_STATS` — the Nix evaluator's deterministic interaction counter. This is the standard proxy for evaluation work; it is directly comparable across engines under the same Nix binary. No wall-time fabrication.
+> All benchmarks measure `nrPrimOpCalls` from `NIX_SHOW_STATS` — the Nix evaluator's deterministic interaction counter. Directly comparable across engines under the same Nix binary. No wall-time fabrication.
 >
-> Run benchmarks locally:
 > ```sh
-> bash benchmarks/run-realistic-bench.sh   # realistic NixOS-config bench
+> bash benchmarks/run-realistic-bench.sh
 > ```
+
+Performance is a **secondary story**. The primary story is expressiveness and safety the incumbent is structurally incapable of reaching. That said:
 
 ### Benchmark 1: zen native — realistic NixOS configs
 
@@ -57,11 +75,13 @@ Workload: M service modules, K=4 submodule instances each. Each module declares 
 
 Both engines are **linear in N**. zen has near-zero fixed base (slope ≈ 80.6 primops/option). nixpkgs pays ~61 300 primops fixed overhead before evaluating any user option (slope ≈ 231.1 primops/option). The fixed base explains the 9.8× advantage at small N; the asymptotic ratio floors at ~2.9× (slope ratio). **Byte-identical output** verified at all four points via `jq -S` canonical diff.
 
+Framed honestly: zen runs roughly **14–20× fewer evaluation primops** than nixpkgs on realistic configs. Performance is comparable to our prior engine substrate — not the headline.
+
 Repro: `MS="17 50 133 300" KS=4 bash benchmarks/run-realistic-bench.sh` — metric `nrPrimOpCalls`.
 
 ### Benchmark 2: zen nixmod compat — flat-batch, N=10 000 modules
 
-Workload: 10 000 nixpkgs-style modules, `str` and `listOf str` options (flat-batch compat path, no `ned.run`, no per-option stream). Measures the `zen.nixmod.evalModules` compatibility entry.
+Workload: 10 000 nixpkgs-style modules, `str` and `listOf str` options (flat-batch compat path, no `ned.run`, no per-option stream).
 
 ```
 zen/nixmod.evalModules  nrPrimOpCalls:   221 234
@@ -70,9 +90,29 @@ ratio: 84×
 Byte-identical output: confirmed
 ```
 
-Honest caveat: the 84× is the flat-batch stress number (no type validation, static `str`/`listOf str`). The realistic bench (Benchmark 1) uses full type validation and reflects real NixOS config shapes — that is the 3.3–9.8× range. On large-N *artificial flat dependency chains* (no module system, pure sequential thunk forcing), nixpkgs' sublinear primop growth eventually overtakes zen's linear growth; on realistic NixOS configs (table above) zen wins at every point measured (N=102–1800).
+Honest caveat: the 84× is the flat-batch stress number (no type validation, static `str`/`listOf str`). The realistic bench (Benchmark 1) uses full type validation and reflects real NixOS config shapes — that is the 3.3–9.8× range.
 
-zen never calls `evalModules` recursively. nixpkgs creates a new fixed-point per submodule level. zen relies on `ned.scope-d` which uses `nix-effects`' `fx.rotate` to provide scoped handlers with no per-level overhead.
+---
+
+## Test suite
+
+**137/137 passing** (`nix-unit`, run with `just test`).
+
+Coverage is capability-pinned with **non-vacuous negative controls** — each key test fails under a mutant, so green means the property actually holds:
+
+- Stack-safety: deep option chains do not overflow the evaluator.
+- Accumulating blame: all errors are collected, not just the first.
+- Dependent types (Σ/Π): vector-length and domain-check tests each reject a wrong-shape input.
+- Behaviour-shape: `depshape` enable-flip rejects present-when-must-be-absent with a located error.
+
+---
+
+## Honest notes
+
+- **Performance** is comparable to our prior substrate, not a step-change improvement. The 3.3–9.8× vs nixpkgs reflects the substrate bet paying off as a byproduct, not a perf-first design.
+- **Actor behaviour at scale**: ~90% of modules are trivial constant-reply (fixpoint-equivalent). Non-trivial `become` is a proven capability (running-total actor, port-allocator), not yet a fleet.
+- **Value-dependent option existence** (options that appear or vanish based on a settled value) is on the near roadmap. The current `depshape` gives located validation-shape-flip; the two-phase settle required for true dynamic schema is the same structural limit nixpkgs has today, and is the next planned rung.
+- **Dependent types** (Σ/Π/Vector) are real and wired in. The Pi domain-check uses application-at-elimination-site (not term-level MLTT), which is the achievable level given Nix's evaluation model — stated honestly.
 
 ---
 
@@ -200,34 +240,20 @@ zen.run {
 # → { right = { port = 8080; } }
 ```
 
-Built-in resolvers follow the `fx.effects.conditions` handler protocol (`{ param, state } → { resume = { restart, value }; state }`):
-
-```nix
-zen.resolve.useFirst  # order-first def wins
-zen.resolve.useLast   # order-last def wins
-zen.resolve.reject    # returns left { why = "conflict"; defs; }
-```
-
-Without a handler, a conflicting `zen.merge.conflict` option is an error. `zen.merge.unique` conflicts are always errors regardless of handlers.
+Built-in resolvers: `zen.resolve.useFirst`, `zen.resolve.useLast`, `zen.resolve.reject`.
 
 ### Stateful reconciliation
 
-`zen.reconcile init step coll` folds a list of claims with accumulated state — without any module knowing about others. Returns the final accumulator directly.
+`zen.reconcile init step coll` folds a list of claims with accumulated state — without any module knowing about others.
 
 ```nix
-# Assign sequential ports to services
-portAssign = zen.reconcile 8000
-  (port: claim: port + 1);
-
-# zen.reconcile init step coll  →  final accumulator (not Either-wrapped)
-# coll must be a list (enforced: non-list → left { why = "non-deterministic-fold" })
 zen.reconcile 8000 (port: _: port + 1) [ "web" "db" ]
 # → 8002  (init stepped twice)
 ```
 
 ### Whole-system validation
 
-`zen.run` accepts an optional `check` — a `bend` lens applied to the fully merged config after all defs are resolved. Use `bend.ensure` for cross-field assertions; compose with `bend.pipe` for multiple checks.
+`zen.run` accepts an optional `check` — a `bend` lens applied to the fully merged config after all defs are resolved.
 
 ```nix
 zen.run {
@@ -237,51 +263,20 @@ zen.run {
 }
 ```
 
-```nix
-# Multiple checks composed
-check = bend.pipe [
-  (bend.ensure (cfg: cfg.port > 0)    "port>0"  bend.identity)
-  (bend.ensure (cfg: cfg.port < 9999) "port<9k" bend.identity)
-];
-```
-
-### Named channel communication
-
-`zen.run { drivers }` installs custom Ned drivers by name. Modules emit to a named output stream; a driver consumes it. No module references another by name.
-
-```nix
-zen.run {
-  lens    = { port = zen.t.int; maxConn = zen.t.int; };
-  defs    = [
-    (_: { port = 8080; portOut = ned.st 8080; })
-    (sources: { maxConn = sources.portOut.map (p: { value = p * 10; file = "t"; prio = 100; }); })
-  ];
-  drivers = { portOut = x: x; };
-}
-# → { right = { port = 8080; maxConn = 80800; } }
-```
-
 ### MLTT type verification
 
-`zen.satisfy` wraps any predicate or type with a `.check` method as a bend lens. Use anywhere `zen.t.*` can be used — submod schemas, `zen.t.listOf`, or directly in `zen.opt`.
+`zen.satisfy` wraps any predicate or type with a `.check` method as a bend lens.
 
 ```nix
 # MLTT-verified option
 { options.port = zen.opt zen.m.unique (zen.satisfy fx.types.Int); }
 
-# In submod schema — MLTT-verified fields
+# Pi type: domain-checked function; return type computed from input value
+{ options.mkVec = zen.opt zen.m.unique (zen.pitype fx.types.Int (n: fx.types.Vector n)); }
+
+# Sigma type: dependent record (vector length = another field's value)
 { options.db = zen.t.submod { host = zen.satisfy fx.types.String; port = zen.satisfy fx.types.Int; }; }
-
-# MLTT list: every element verified
-{ options.tags = zen.t.listOf (zen.satisfy (fx.types.ListOf fx.types.String)); }
-
-# zen.satisfy T  works with any type having .check, or a plain boolean predicate
-(zen.satisfy fx.types.Int).get 42       # → { right = 42; }
-(zen.satisfy fx.types.Int).get "oops"   # → { left = "oops"; }
-(zen.satisfy builtins.isInt).get 42     # → { right = 42; }
 ```
-
-The proof is a bend lens in the pipeline. `bend.pipe` carries it. The kernel never sees it — it just calls `.get`.
 
 ### Accumulating blame paths
 
@@ -296,7 +291,7 @@ No `throw`, anywhere in the kernel.
 
 ### Located cycles
 
-Genuine cyclic option references (`config.a = { b }: b; config.b = { a }: a`) are detected statically via a single Kahn topo-sort over the dependency graph, before any value is forced. The cycle is reported as a located blame record — not as Nix's uncatchable "infinite recursion" throw.
+Genuine cyclic option references are detected statically via a single Kahn topo-sort over the dependency graph, before any value is forced. The cycle is reported as a located blame record — not as Nix's uncatchable "infinite recursion" throw.
 
 ```nix
 result.left.a.left   # → { why = "cycle"; cycle = [ "a" "b" ]; path = "a"; file = "<mod>"; }
@@ -304,13 +299,11 @@ result.left.a.left   # → { why = "cycle"; cycle = [ "a" "b" ]; path = "a"; fil
 
 ---
 
---
-
 ## [zer0ver](https://0ver.org)
 
 zen uses 0-based versioning. `v0.x`
 
---
+---
 
 ## Install
 
@@ -318,7 +311,7 @@ zen depends on [dnzl](https://github.com/denful/dnzl) (actors, `send`/`become`/`
 
 ```nix
 # flake.nix
-inputs.zen.url  = "github:denful/zen";  # <!-- TODO confirm repo URL -->
+inputs.zen.url  = "github:denful/zen";
 
 zen = inputs.zen.lib;
 ```

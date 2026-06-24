@@ -75,6 +75,30 @@ capture "$DEMOS_DIR/actor/dzm-side.nix"
 printf '  dzm:     clean exit=%s\n' "$RC"
 printf '  result:  %s\n' "$OUT"
 
+# ─────────────────────────────────────────────────────────────────────────────
+sep
+hdr "DEMO 4 — Value-dependent option EXISTENCE (actor 'become')"
+hdr "enable's VALUE flips which options exist: true -> {turbo,maxSpeed} ARE the"
+hdr "interface; false -> they are NOT (present -> located error)."
+hdr "nixpkgs: config-dependent DECLARATION -> 'infinite recursion encountered'."
+hdr "dzm:     fx Sigma + large elimination in the check seam -> shape flips, no abort."
+sep
+
+printf '\n'
+printf '  nixpkgs side (declare turbo only when enable -> config-in-imports):\n'
+capture "$DEMOS_DIR/behaviour/nixpkgs-side.nix"
+printf '  nixpkgs: ABORTS exit=%s\n' "$RC"
+printf '%s\n' "$OUT" | grep -E "error: infinite recursion|reference .config. in .imports." | head -2 | sed 's/^/    /'
+
+printf '\n'
+printf '  dzm side:\n'
+capture "$DEMOS_DIR/behaviour/dzm-side.nix"
+printf '  dzm:     clean exit=%s\n' "$RC"
+printf '  result:  %s\n' "$OUT"
+printf '  note:    enable flips the accepted option SHAPE; absent/present enforced\n'
+printf '           per behaviour (NOT a literal lens-key change — that shares the\n'
+printf '           nixpkgs lazy-fixpoint limit; this is the strongest runnable form).\n'
+
 sep
 printf '\n'
 printf '  SUMMARY\n'
@@ -83,4 +107,5 @@ printf '  %-30s  %s\n' "------------------------------" "-----------------------
 printf '  %-30s  %s\n' "blame (2 type errors)" "ABORTS on 1st  vs  ALL errors returned"
 printf '  %-30s  %s\n' "cycle (a<->b)" "infinite recursion  vs  located {why=cycle}"
 printf '  %-30s  %s\n' "actor ([10,20,30])" "final=60 only  vs  totals=[10,30,60]"
+printf '  %-30s  %s\n' "option existence (enable)" "infinite recursion  vs  shape flips per value"
 printf '\n'
