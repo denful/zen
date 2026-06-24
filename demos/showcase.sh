@@ -9,8 +9,8 @@ set -uo pipefail
 
 ACT="${1:-all}"
 case "$ACT" in
-  all|blame|partial|cycle|recover|policy|actor|behaviour|deptype|pitype|discovery) ;;
-  *) printf 'unknown demo: %s\n  valid: blame partial cycle recover policy actor behaviour deptype pitype discovery all\n' "$ACT" >&2; exit 1 ;;
+  all|blame|partial|cycle|recover|policy|actor|behaviour|deptype|pitype|discovery|refined|deprecord|crossfield) ;;
+  *) printf 'unknown demo: %s\n  valid: blame partial cycle recover policy actor behaviour deptype pitype discovery refined deprecord crossfield all\n' "$ACT" >&2; exit 1 ;;
 esac
 want() { [ "$ACT" = "all" ] || [ "$ACT" = "$1" ]; }
 
@@ -600,6 +600,161 @@ pause 0.6
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# ACT 11 — REFINED TYPES: a named bound, carried as data
+# ═══════════════════════════════════════════════════════════════════════════════
+if want refined; then
+title_box "ACT 11 — REFINED TYPES: a named bound, carried as data" "port : Port where 1024 ≤ n ≤ 65535."
+
+printf "  nixpkgs: types.ints.between throws a generic string — the type name + bound are buried, unrecoverable as data.\n"
+printf "  dzm: the refinement type names itself; a bad value is LOCATED data naming the type.\n\n"
+
+pause 0.4
+
+printf "  ${BOLD}── nixpkgs ──${RESET}\n"
+capture_json "$DEMOS_DIR/refined/nixpkgs-side.nix"
+if command -v jq &>/dev/null && [ -n "${JSON:-}" ]; then
+  nx_msg=$(printf '%s\n' "$JSON" | jq -r '."blame-is-thrown-string"' 2>/dev/null || true)
+  printf "  ${RED_X} nixpkgs: thrown string — name/bound buried, not data: %s${RESET}\n" "$nx_msg"
+else
+  printf '  result (raw): %s\n' "${JSON:-}"
+fi
+
+pause 0.4
+printf '\n'
+printf "  ${BOLD}── dzm ──${RESET}\n"
+capture_json "$DEMOS_DIR/refined/dzm-side.nix"
+printf "  ${GREEN_OK} dzm: clean${RESET}\n"
+if command -v jq &>/dev/null && [ -n "${JSON:-}" ]; then
+  rej_name=$(printf '%s\n' "$JSON" | jq -r '.rejected.left.errors[0].name' 2>/dev/null || true)
+  rej_got=$(printf '%s\n' "$JSON" | jq -r '.rejected.left.errors[0].got'  2>/dev/null || true)
+  acc_port=$(printf '%s\n' "$JSON" | jq -r '.accepted.right.port'         2>/dev/null || true)
+  printf "  ${RED_X} port=80 rejected, type=\"%s\" (named, as data)   got=%s\n${RESET}" "$rej_name" "$rej_got"
+  printf "  ${GREEN_OK} port=%s ✓ right${RESET}\n" "$acc_port"
+else
+  printf '  result (raw): %s\n' "${JSON:-}"
+fi
+
+pause 0.4
+printf '\n'
+printf "  ${DIM}→ Same predicate nixpkgs runs — but dzm keeps the type NAME + the failure as located DATA,${RESET}\n"
+printf "  ${DIM}  not a thrown string. (Reified, introspectable refinement; honest: a predicate witness,${RESET}\n"
+printf "  ${DIM}  not a dependent type.)${RESET}\n"
+
+pause 0.6
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ACT 12 — DEPENDENT RECORD: a field's TYPE from another field's VALUE
+# ═══════════════════════════════════════════════════════════════════════════════
+if want deprecord; then
+title_box "ACT 12 — DEPENDENT RECORD: a field's TYPE from another field's VALUE" "kind : enum;  addr : typeOf(kind)."
+
+printf "  nixpkgs: a field's type is fixed before any value is known — kind can't choose addr's type; the idiom is an assertion at rebuild.\n"
+printf "  dzm: addr : snd kind — the TYPE of addr is computed from kind's VALUE.\n\n"
+
+pause 0.4
+
+printf "  ${BOLD}── dzm ── (TYPE follows VALUE)${RESET}\n"
+capture_json "$DEMOS_DIR/deprecord/dzm-side.nix"
+printf "  ${GREEN_OK} dzm: clean${RESET}\n"
+if command -v jq &>/dev/null && [ -n "${JSON:-}" ]; then
+  ip_static=$(printf '%s\n' "$JSON" | jq -r '.same_addr_kind_flips.ip_at_static.settled'   2>/dev/null || true)
+  ip_dhcp=$(  printf '%s\n' "$JSON" | jq -r '.same_addr_kind_flips.ip_at_dhcp.settled'     2>/dev/null || true)
+  ip_dhcp_exp=$(printf '%s\n' "$JSON" | jq -r '.same_addr_kind_flips.ip_at_dhcp.blame.expected' 2>/dev/null || true)
+  nu_dhcp=$(  printf '%s\n' "$JSON" | jq -r '.same_addr_kind_flips.null_at_dhcp.settled'   2>/dev/null || true)
+  nu_static=$(printf '%s\n' "$JSON" | jq -r '.same_addr_kind_flips.null_at_static.settled' 2>/dev/null || true)
+  nu_static_exp=$(printf '%s\n' "$JSON" | jq -r '.same_addr_kind_flips.null_at_static.blame.expected' 2>/dev/null || true)
+  printf "  kind=static → addr must be IPv4:   addr=\"10.0.0.1\" %s   addr=null %s (expected %s)\n" \
+    "$( [ "$ip_static" = 'right' ] && printf "${GREEN_OK} right${RESET}" || printf "unexpected: %s" "$ip_static" )" \
+    "$( [ "$nu_static" = 'left'  ] && printf "${RED_X} left${RESET}"  || printf "unexpected: %s" "$nu_static" )" \
+    "$nu_static_exp"
+  pause 0.3
+  printf "  kind=dhcp   → addr must be Null:   addr=null %s   addr=\"10.0.0.1\" %s (expected %s)\n" \
+    "$( [ "$nu_dhcp" = 'right' ] && printf "${GREEN_OK} right${RESET}" || printf "unexpected: %s" "$nu_dhcp" )" \
+    "$( [ "$ip_dhcp" = 'left'  ] && printf "${RED_X} left${RESET}"  || printf "unexpected: %s" "$ip_dhcp" )" \
+    "$ip_dhcp_exp"
+else
+  printf '  result (raw): %s\n' "${JSON:-}"
+fi
+
+pause 0.4
+printf '\n'
+printf "  ${BOLD}── nixpkgs ──${RESET}\n"
+capture_json "$DEMOS_DIR/deprecord/nixpkgs-side.nix"
+if command -v jq &>/dev/null && [ -n "${JSON:-}" ]; then
+  nx_addr_type=$(printf '%s\n' "$JSON" | jq -r '.addr_type_is_fixed' 2>/dev/null || true)
+  printf "  ${RED_X} nixpkgs: addr has ONE fixed type regardless of kind (%s; assertion side-check only)${RESET}\n" "$nx_addr_type"
+else
+  printf '  result (raw): %s\n' "${JSON:-}"
+fi
+
+pause 0.4
+printf '\n'
+printf "  ${DIM}→ SAME addr, different kind, different verdict — addr's TYPE is a function of kind's VALUE${RESET}\n"
+printf "  ${DIM}  (genuine Martin-Löf Σ). nixpkgs types are fixed before values exist.${RESET}\n"
+
+pause 0.6
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ACT 13 — CROSS-FIELD INVARIANT: located to the offending fields
+# ═══════════════════════════════════════════════════════════════════════════════
+if want crossfield; then
+title_box "ACT 13 — CROSS-FIELD INVARIANT: located to the offending fields" "protocol=tcp ⇒ port > 1024."
+
+printf "  nixpkgs: cross-field rules live in assertions — an unstructured string that aborts, with no field locus.\n"
+printf "  dzm: a whole-config check returns located, structured data naming the fields.\n\n"
+
+pause 0.4
+
+printf "  ${BOLD}── nixpkgs ──${RESET}\n"
+capture_json "$DEMOS_DIR/crossfield/nixpkgs-side.nix"
+if command -v jq &>/dev/null && [ -n "${JSON:-}" ]; then
+  nx_msg=$(printf '%s\n' "$JSON" | jq -r '.failure_messages_unstructured[0]' 2>/dev/null || true)
+  printf "  ${RED_X} nixpkgs: unstructured throw: %s; no {fields} record${RESET}\n" "$nx_msg"
+else
+  printf '  result (raw): %s\n' "${JSON:-}"
+fi
+
+pause 0.4
+printf '\n'
+printf "  ${BOLD}── dzm ──${RESET}\n"
+capture_json "$DEMOS_DIR/crossfield/dzm-side.nix"
+printf "  ${GREEN_OK} dzm: clean${RESET}\n"
+if command -v jq &>/dev/null && [ -n "${JSON:-}" ]; then
+  viol_settled=$(   printf '%s\n' "$JSON" | jq -r '.violation.settled'              2>/dev/null || true)
+  viol_fields=$(    printf '%s\n' "$JSON" | jq -r '.violation.blame.fields|join(", ")' 2>/dev/null || true)
+  viol_constraint=$(printf '%s\n' "$JSON" | jq -r '.violation.blame.constraint'     2>/dev/null || true)
+  ok_settled=$(     printf '%s\n' "$JSON" | jq -r '.ok.settled'                     2>/dev/null || true)
+  ok_port=$(        printf '%s\n' "$JSON" | jq -r '.ok.value.port'                  2>/dev/null || true)
+  ok_proto=$(       printf '%s\n' "$JSON" | jq -r '.ok.value.protocol'              2>/dev/null || true)
+  exempt_settled=$( printf '%s\n' "$JSON" | jq -r '.exempt.settled'                 2>/dev/null || true)
+  exempt_proto=$(   printf '%s\n' "$JSON" | jq -r '.exempt.value.protocol'          2>/dev/null || true)
+  exempt_port=$(    printf '%s\n' "$JSON" | jq -r '.exempt.value.port'              2>/dev/null || true)
+  printf "  %s tcp+port=80 → located left, fields=[%s], constraint=%s\n" \
+    "$( [ "$viol_settled" = 'left' ] && printf "${RED_X}${RESET}" || printf '?' )" \
+    "$viol_fields" "$viol_constraint"
+  pause 0.3
+  printf "  %s %s+port=%s ✓ right\n" \
+    "$( [ "$ok_settled" = 'right' ] && printf "${GREEN_OK}${RESET}" || printf '?' )" \
+    "$ok_proto" "$ok_port"
+  printf "  %s %s+port=%s ✓ right\n" \
+    "$( [ "$exempt_settled" = 'right' ] && printf "${GREEN_OK}${RESET}" || printf '?' )" \
+    "$exempt_proto" "$exempt_port"
+else
+  printf '  result (raw): %s\n' "${JSON:-}"
+fi
+
+pause 0.4
+printf '\n'
+printf "  ${DIM}→ The violation is structured DATA naming the exact fields — not a thrown string.${RESET}\n"
+printf "  ${DIM}  (Honest: bend.pipe short-circuits on the first violation, not all-at-once —${RESET}\n"
+printf "  ${DIM}  still located+structured, which nixpkgs assertions never are.)${RESET}\n"
+
+pause 0.6
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # CLOSING BOX — summary table + honest scope
 # ═══════════════════════════════════════════════════════════════════════════════
 if [ "$ACT" = "all" ]; then
@@ -619,6 +774,9 @@ printf "  %-28s  %-22s  %-22s\n" "behaviour shape-flip"    "infinite recursion" 
 printf "  %-28s  %-22s  %-22s\n" "dependent type (Vector n)" "structurally blocked"   "items:Vector n live"
 printf "  %-28s  %-22s  %-22s\n" "Π-type (domain+codomain)" "codomain-only (no domain)" "full Π(x:A).B(x)"
 printf "  %-28s  %-22s  %-22s\n" "discovery (client finds \"cache\")" "hardcodes provider path" "discovers by name, rewires 0-edit"
+printf "  %-28s  %-22s  %-22s\n" "refined (Port 1024-65535)"     "thrown string, name buried" "named type as data"
+printf "  %-28s  %-22s  %-22s\n" "deprecord (kind→addr type)"    "fixed type, assertion only" "addr type = f(kind value)"
+printf "  %-28s  %-22s  %-22s\n" "crossfield (tcp⇒port>1024)"   "unstructured throw, no locus" "located fields+constraint"
 printf '\n'
 printf "  ${DIM}Honest scope: Capabilities nixpkgs lib.evalModules structurally${RESET}\n"
 printf "  ${DIM}cannot reach. Raw perf is secondary (the story is expressiveness${RESET}\n"
