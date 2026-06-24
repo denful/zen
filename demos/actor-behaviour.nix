@@ -24,7 +24,7 @@
 # set must be known to build the cycle that settles the value the option set would
 # depend on. See the `nixpkgsNote` field.
 let
-  zen = import /home/vic/hk/workspace/actor-ws { };
+  zen = import ../. { };
   inherit (zen) fx;
   H = fx.types.hoas;
 

@@ -3,7 +3,7 @@
 # dzm detects the cycle statically via Kahn topo-sort and returns a located
 # left { why = "cycle"; cycle = [...]; } — never throws, never hangs.
 let
-  zen = import /home/vic/hk/workspace/demos-ws { };
+  zen = import ../../. { };
   r = zen.run {
     modules = [
       {

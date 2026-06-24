@@ -5,7 +5,7 @@
 # LARGE ELIMINATION (`zen.depshape`): the accepted record SHAPE is `snd enable`.
 # Errors are DATA (a located left), never an abort.
 let
-  zen = import /home/vic/hk/workspace/actor-ws { };
+  zen = import ../../. { };
   inherit (zen) fx;
   H = fx.types.hoas;
 

@@ -3,7 +3,7 @@
 # A dnzl actor-handle (zen.t.actor) is passed through the typed dep graph.
 # zen.send runs a fresh point-to-point session: [10,20,30] → [10,30,60].
 let
-  zen = import /home/vic/hk/workspace/demos-ws { };
+  zen = import ../../. { };
 
   # The running-total actor: reply.right the new cumulative total, become the
   # next state. A genuine dnzl actor-handle — stateful via become.

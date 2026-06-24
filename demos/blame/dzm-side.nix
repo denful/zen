@@ -2,7 +2,7 @@
 # Same two options (port, workers) both given wrong types.
 # dzm zen.run collects ALL errors — both surface in left.errors.
 let
-  zen = import /home/vic/hk/workspace/demos-ws { };
+  zen = import ../../. { };
   r = zen.run {
     modules = [
       {
