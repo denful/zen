@@ -9,8 +9,8 @@ set -uo pipefail
 
 ACT="${1:-all}"
 case "$ACT" in
-  all|blame|partial|cycle|recover|policy|actor|behaviour|deptype|pitype) ;;
-  *) printf 'unknown demo: %s\n  valid: blame partial cycle recover policy actor behaviour deptype pitype all\n' "$ACT" >&2; exit 1 ;;
+  all|blame|partial|cycle|recover|policy|actor|behaviour|deptype|pitype|discovery) ;;
+  *) printf 'unknown demo: %s\n  valid: blame partial cycle recover policy actor behaviour deptype pitype discovery all\n' "$ACT" >&2; exit 1 ;;
 esac
 want() { [ "$ACT" = "all" ] || [ "$ACT" = "$1" ]; }
 
@@ -559,6 +559,47 @@ pause 0.6
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# ACT 10 — DISCOVERY: modules that find each other without knowing each other
+# ═══════════════════════════════════════════════════════════════════════════════
+if want discovery; then
+title_box "ACT 10 — DISCOVERY: modules that find each other without knowing each other" "A client discovers a 'cache' provider by capability — never naming it."
+
+printf "  nixpkgs: the consumer must HARDCODE the provider path (config.services.redis.url) — swap provider = edit consumer; no capability namespace.\n"
+printf "  dzm: providers publish a capability; a broker wires them by NAME at settle-time; neither side references the other.\n\n"
+
+pause 0.4
+
+printf "  ${BOLD}── nixpkgs ──${RESET}\n"
+capture_json "$DEMOS_DIR/discovery/nixpkgs-side.nix"
+if command -v jq &>/dev/null && [ -n "${JSON:-}" ]; then
+  printf '%s\n' "$JSON" | jq -r '"  consumer must reference: \(.consumerMustReference)   ·   capability namespace: none   ·   swap provider ⟹ edit consumer"' 2>/dev/null \
+    | while IFS= read -r line; do printf "  ${RED}%s${RESET}\n" "$line"; done || true
+else
+  printf '  result (raw): %s\n' "${JSON:-}"
+fi
+
+pause 0.4
+printf '\n'
+printf "  ${BOLD}── dzm ── (discover by capability name)${RESET}\n"
+capture_json "$DEMOS_DIR/discovery/dzm-side.nix"
+printf "  ${GREEN_OK} dzm: clean${RESET}\n"
+if command -v jq &>/dev/null && [ -n "${JSON:-}" ]; then
+  printf '%s\n' "$JSON" | jq -r '"  discover \"cache\"            ⟹ ✓ resolved: \(.resolved.cacheUrl)  (from \(.resolved.resolvedFrom));  losers: \(.resolved.losers|join(", "))"' 2>/dev/null \
+    | while IFS= read -r line; do printf "${GREEN}%s${RESET}\n" "$line"; done || true
+  printf '%s\n' "$JSON" | jq -r '"  flip providerA priority < B  ⟹ ✓ rewired:  \(.rewired.cacheUrl)  (from \(.rewired.resolvedFrom)) — SAME client logic, ZERO consumer edits"' 2>/dev/null \
+    | while IFS= read -r line; do printf "${GREEN}%s${RESET}\n" "$line"; done || true
+else
+  printf '  result (raw): %s\n' "${JSON:-}"
+fi
+
+pause 0.4
+printf '\n'
+printf "  ${DIM}→ Producer publishes a capability; consumer discovers by NAME; a broker (a pure selector over a registrations stream, settled in one eval — not a live daemon) wires them. Neither references the other — swap the provider, the consumer is untouched. Real-world: service discovery / dependency injection, in config.${RESET}\n"
+
+pause 0.6
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # CLOSING BOX — summary table + honest scope
 # ═══════════════════════════════════════════════════════════════════════════════
 if [ "$ACT" = "all" ]; then
@@ -577,6 +618,7 @@ printf "  %-28s  %-22s  %-22s\n" "actor ([10,20,30])"      "final=60 only"      
 printf "  %-28s  %-22s  %-22s\n" "behaviour shape-flip"    "infinite recursion"       "LOCATED shape verdict"
 printf "  %-28s  %-22s  %-22s\n" "dependent type (Vector n)" "structurally blocked"   "items:Vector n live"
 printf "  %-28s  %-22s  %-22s\n" "Π-type (domain+codomain)" "codomain-only (no domain)" "full Π(x:A).B(x)"
+printf "  %-28s  %-22s  %-22s\n" "discovery (client finds \"cache\")" "hardcodes provider path" "discovers by name, rewires 0-edit"
 printf '\n'
 printf "  ${DIM}Honest scope: Capabilities nixpkgs lib.evalModules structurally${RESET}\n"
 printf "  ${DIM}cannot reach. Raw perf is secondary (the story is expressiveness${RESET}\n"
