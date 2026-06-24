@@ -18,11 +18,15 @@ let
     modules = [
       {
         options.counter = zen.opt zen.m.unique zen.t.actor;
-        options.batch   = zen.t.listOf zen.t.int;
-        options.totals  = zen.t.listOf zen.t.int;
-        config.counter  = { }: counterActor;
-        config.batch    = [ 10 20 30 ];
-        config.totals   = { counter, batch }: zen.send counter batch;
+        options.batch = zen.t.listOf zen.t.int;
+        options.totals = zen.t.listOf zen.t.int;
+        config.counter = { }: counterActor;
+        config.batch = [
+          10
+          20
+          30
+        ];
+        config.totals = { counter, batch }: zen.send counter batch;
       }
     ];
   };

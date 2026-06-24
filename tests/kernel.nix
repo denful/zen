@@ -142,7 +142,13 @@ in
         { config.vals = [ 20 ]; }
         { config.vals = [ 30 ]; }
       ];
-      expected = bend.right { vals = [ 10 20 30 ]; };
+      expected = bend.right {
+        vals = [
+          10
+          20
+          30
+        ];
+      };
     };
 
     # TC-B: cycle stack-safety discriminator (N=5000).
@@ -157,9 +163,7 @@ in
     test-cycle-large-n-stack-safety =
       let
         cycleN = 5000;
-        mods =
-          [ { options.vals = listIntL; } ]
-          ++ builtins.genList (i: { config.vals = [ i ]; }) cycleN;
+        mods = [ { options.vals = listIntL; } ] ++ builtins.genList (i: { config.vals = [ i ]; }) cycleN;
         result = zen.run mods;
       in
       {

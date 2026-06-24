@@ -6,10 +6,10 @@ let
   r = zen.run {
     modules = [
       {
-        options.port    = zen.opt zen.m.unique zen.t.int;
+        options.port = zen.opt zen.m.unique zen.t.int;
         options.workers = zen.opt zen.m.unique zen.t.int;
-        config.port    = "not-a-number";        # wrong: string, expects int
-        config.workers = "also-not-a-number";   # wrong: string, expects int
+        config.port = "not-a-number"; # wrong: string, expects int
+        config.workers = "also-not-a-number"; # wrong: string, expects int
       }
     ];
   };

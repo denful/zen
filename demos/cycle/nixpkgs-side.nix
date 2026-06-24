@@ -16,4 +16,6 @@ let
   };
 in
 # Force evaluation — triggers "infinite recursion encountered"
-{ inherit (m.config) a b; }
+{
+  inherit (m.config) a b;
+}

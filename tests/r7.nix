@@ -202,10 +202,12 @@ in
     test_R7_listOf_submod_positive = {
       expr = zen.run [
         {
-          options.deps = zen.types.listOf (zen.types.submod {
-            name = zen.types.str;
-            version = zen.types.str;
-          });
+          options.deps = zen.types.listOf (
+            zen.types.submod {
+              name = zen.types.str;
+              version = zen.types.str;
+            }
+          );
           config.deps = [
             {
               name = "d1";
@@ -236,10 +238,12 @@ in
       let
         r = zen.run [
           {
-            options.deps = zen.types.listOf (zen.types.submod {
-              name = zen.types.str;
-              version = zen.types.str;
-            });
+            options.deps = zen.types.listOf (
+              zen.types.submod {
+                name = zen.types.str;
+                version = zen.types.str;
+              }
+            );
             config.deps = [
               {
                 name = "d1";
@@ -263,10 +267,12 @@ in
       let
         r = zen.run [
           {
-            options.deps = zen.types.listOf (zen.types.submod {
-              name = zen.types.str;
-              version = zen.types.str;
-            });
+            options.deps = zen.types.listOf (
+              zen.types.submod {
+                name = zen.types.str;
+                version = zen.types.str;
+              }
+            );
             config.deps = [
               {
                 name = "d1";
@@ -289,10 +295,12 @@ in
     test_R7_attrsOf_submod_positive = {
       expr = zen.run [
         {
-          options.deps = zen.types.attrsOf (zen.types.submod {
-            name = zen.types.str;
-            version = zen.types.str;
-          });
+          options.deps = zen.types.attrsOf (
+            zen.types.submod {
+              name = zen.types.str;
+              version = zen.types.str;
+            }
+          );
           config.deps = {
             d1 = {
               name = "d1";

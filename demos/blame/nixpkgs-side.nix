@@ -10,11 +10,13 @@ let
       {
         options.port = lib.mkOption { type = lib.types.int; };
         options.workers = lib.mkOption { type = lib.types.int; };
-        config.port = "not-a-number";       # wrong: string, expects int
+        config.port = "not-a-number"; # wrong: string, expects int
         config.workers = "also-not-a-number"; # wrong: string, expects int
       }
     ];
   };
 in
 # Accessing both — nixpkgs throws on the first, never reaching the second.
-{ inherit (m.config) port workers; }
+{
+  inherit (m.config) port workers;
+}
