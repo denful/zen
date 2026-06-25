@@ -28,7 +28,7 @@ let
   # addr's type is FIXED as nullOr str — it does not depend on kind's value.
   cfg = {
     kind = "static";
-    addr = null;         # null is accepted by the static type (nullOr str) ...
+    addr = null; # null is accepted by the static type (nullOr str) ...
   };
 
   # ... but null is WRONG for kind=static: we need an IPv4.
@@ -37,10 +37,12 @@ let
     {
       # The type of addr is always the same; only the boolean differs.
       assertion =
-        if cfg.kind == "dhcp"
-        then cfg.addr == null
-        else cfg.addr != null && builtins.isString cfg.addr
-             && builtins.match "[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+" cfg.addr != null;
+        if cfg.kind == "dhcp" then
+          cfg.addr == null
+        else
+          cfg.addr != null
+          && builtins.isString cfg.addr
+          && builtins.match "[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+" cfg.addr != null;
       message =
         "addr type depends on kind: kind=${cfg.kind} requires "
         + (if cfg.kind == "dhcp" then "null" else "an IPv4 string")
@@ -52,10 +54,10 @@ let
 
   # evalModules throws this unstructured string — no {path, expected, got}.
   assertionResult =
-    if failedAssertions != [ ]
-    then throw (builtins.concatStringsSep "\n"
-          (map (a: "- ${a.message}") failedAssertions))
-    else cfg;
+    if failedAssertions != [ ] then
+      throw (builtins.concatStringsSep "\n" (map (a: "- ${a.message}") failedAssertions))
+    else
+      cfg;
 in
 {
   # 1. What nixpkgs knows about addr's type: ONE fixed type, independent of kind.
@@ -75,9 +77,9 @@ in
   #    (Shown here as what nixpkgs would produce, captured in failure_signal.value
   #    which is false when throw fires — the message is lost to the caller.)
   limitation = {
-    can_express_dependent_type    = false;
+    can_express_dependent_type = false;
     failure_carries_fields_record = false;
     failure_carries_expected_type = false;
-    idiom                         = "assertion: boolean predicate + unstructured string throw";
+    idiom = "assertion: boolean predicate + unstructured string throw";
   };
 }

@@ -41,12 +41,22 @@ let
       losers = cacheEntry.losers;
     };
 
-  providerA = prio: { name = "providerA"; capability = "cache"; endpoint = "redis://10.0.0.1"; priority = prio; };
-  providerB =       { name = "providerB"; capability = "cache"; endpoint = "memcached://10.0.0.2"; priority = 5; };
+  providerA = prio: {
+    name = "providerA";
+    capability = "cache";
+    endpoint = "redis://10.0.0.1";
+    priority = prio;
+  };
+  providerB = {
+    name = "providerB";
+    capability = "cache";
+    endpoint = "memcached://10.0.0.2";
+    priority = 5;
+  };
 in
 {
   # providerA wins (priority 10 > 5) → redis
   resolved = discover (providerA 10) providerB;
   # SAME client logic; only providerA priority changed (3 < 5) → memcached wins
-  rewired  = discover (providerA 3)  providerB;
+  rewired = discover (providerA 3) providerB;
 }

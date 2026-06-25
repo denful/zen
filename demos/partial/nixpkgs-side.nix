@@ -4,12 +4,16 @@
 let
   lib = import <nixpkgs/lib>;
   m = lib.evalModules {
-    modules = [{
-      options.port = lib.mkOption { type = lib.types.int; };
-      options.host = lib.mkOption { type = lib.types.str; };
-      config.port = "nope";
-      config.host = "localhost";
-    }];
+    modules = [
+      {
+        options.port = lib.mkOption { type = lib.types.int; };
+        options.host = lib.mkOption { type = lib.types.str; };
+        config.port = "nope";
+        config.host = "localhost";
+      }
+    ];
   };
 in
-{ inherit (m.config) port host; }
+{
+  inherit (m.config) port host;
+}

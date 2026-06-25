@@ -32,30 +32,40 @@ let
   slotsTypeAt = n: (fx.types.Vector fx.types.Int).apply n;
 
   # Fixed 2-element slot list — the invariant is n == length slots == 2.
-  slots = [ 4040 5050 ];
+  slots = [
+    4040
+    5050
+  ];
 
   # ONE zen.run: both seams (handlers + check) in one call.
-  mesh = resolver: zen.run {
-    lens = {
-      # n is the CONTESTED option — merge.conflict signals a condition the
-      # handler must resolve. Two same-priority defs => genuine 2-def conflict.
-      n     = zen.opt zen.merge.conflict zen.types.int;
-      slots = zen.types.listOf zen.types.int;
+  mesh =
+    resolver:
+    zen.run {
+      lens = {
+        # n is the CONTESTED option — merge.conflict signals a condition the
+        # handler must resolve. Two same-priority defs => genuine 2-def conflict.
+        n = zen.opt zen.merge.conflict zen.types.int;
+        slots = zen.types.listOf zen.types.int;
+      };
+      defs = [
+        (zen.defP 100 {
+          n = 8080;
+          slots = slots;
+        })
+        (zen.defP 100 { n = 9090; })
+      ];
+      # (1) NEGOTIATE: resolve the `n` conflict to ONE value.
+      handlers = {
+        condition = resolver;
+      };
+      # (2) PROVE: slots :: Vector n over the NEGOTIATED config.
+      check = zen.deptype {
+        index = "n";
+        depends = "slots";
+        fst = fx.types.Int;
+        snd = slotsTypeAt;
+      };
     };
-    defs = [
-      (zen.defP 100 { n = 8080; slots = slots; })
-      (zen.defP 100 { n = 9090; })
-    ];
-    # (1) NEGOTIATE: resolve the `n` conflict to ONE value.
-    handlers = { condition = resolver; };
-    # (2) PROVE: slots :: Vector n over the NEGOTIATED config.
-    check = zen.deptype {
-      index   = "n";
-      depends = "slots";
-      fst     = fx.types.Int;
-      snd     = slotsTypeAt;
-    };
-  };
 
   # ── resolvers ────────────────────────────────────────────────────────────────
 
@@ -64,7 +74,7 @@ let
   resolveToValid = { param, state }: {
     resume = {
       restart = "use-value";
-      value   = zen.bend.right (builtins.length param.data.defs); # 2 defs => n=2
+      value = zen.bend.right (builtins.length param.data.defs); # 2 defs => n=2
     };
     inherit state;
   };
@@ -75,12 +85,25 @@ let
   resolveToInvalid = zen.resolve.useLast;
 
   # Render an Either as plain JSON-able data.
-  show = label: r:
-    { case = label; }
-    // (if r ? right
-        then { settled = "right"; negotiated = r.right; }
-        else { settled = "left";  blame = r.left; });
-in {
-  good = show "negotiate->n=2, slots length 2 => Vector n holds"    (mesh resolveToValid);
-  bad  = show "negotiate->n=9090, slots length 2 => Vector n REJECTS" (mesh resolveToInvalid);
+  show =
+    label: r:
+    {
+      case = label;
+    }
+    // (
+      if r ? right then
+        {
+          settled = "right";
+          negotiated = r.right;
+        }
+      else
+        {
+          settled = "left";
+          blame = r.left;
+        }
+    );
+in
+{
+  good = show "negotiate->n=2, slots length 2 => Vector n holds" (mesh resolveToValid);
+  bad = show "negotiate->n=9090, slots length 2 => Vector n REJECTS" (mesh resolveToInvalid);
 }

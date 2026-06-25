@@ -20,51 +20,72 @@ let
   inherit (zen) bend;
 
   # Shared cross-field check: "tcp implies port > 1024"
-  tcpPortCheck = bend.ensure
-    (cfg: !(cfg.protocol == "tcp" && cfg.port <= 1024))
-    { why = "cross-field"; constraint = "tcp:port>1024"; fields = [ "protocol" "port" ]; }
-    bend.identity;
-
-  mk = protocol: port: zen.run {
-    lens = {
-      protocol = zen.types.str;
-      port     = zen.types.port;
-    };
-    defs = [
-      (zen.def { protocol = protocol; })
-      (zen.def { port     = port;     })
+  tcpPortCheck = bend.ensure (cfg: !(cfg.protocol == "tcp" && cfg.port <= 1024)) {
+    why = "cross-field";
+    constraint = "tcp:port>1024";
+    fields = [
+      "protocol"
+      "port"
     ];
-    check = tcpPortCheck;
-  };
+  } bend.identity;
+
+  mk =
+    protocol: port:
+    zen.run {
+      lens = {
+        protocol = zen.types.str;
+        port = zen.types.port;
+      };
+      defs = [
+        (zen.def { protocol = protocol; })
+        (zen.def { port = port; })
+      ];
+      check = tcpPortCheck;
+    };
 
   show =
     label: r:
-    { case = label; }
-    // (if r ? right
-        then { settled = "right"; value = r.right; }
-        else { settled = "left";  blame = r.left;  });
+    {
+      case = label;
+    }
+    // (
+      if r ? right then
+        {
+          settled = "right";
+          value = r.right;
+        }
+      else
+        {
+          settled = "left";
+          blame = r.left;
+        }
+    );
 
   # Two-constraint pipe to demonstrate short-circuit explicitly.
   # constraint1: port > 1024  (fields=[port])
   # constraint2: protocol != "ftp"  (fields=[protocol])
   # With port=80 AND protocol="ftp": only the FIRST failure is returned.
   twoCheckPipe = bend.pipe [
-    (bend.ensure (cfg: cfg.port > 1024)
-      { why = "cross-field"; constraint = "port>1024"; fields = [ "port" ]; }
-      bend.identity)
-    (bend.ensure (cfg: cfg.protocol != "ftp")
-      { why = "cross-field"; constraint = "no-ftp"; fields = [ "protocol" ]; }
-      bend.identity)
+    (bend.ensure (cfg: cfg.port > 1024) {
+      why = "cross-field";
+      constraint = "port>1024";
+      fields = [ "port" ];
+    } bend.identity)
+    (bend.ensure (cfg: cfg.protocol != "ftp") {
+      why = "cross-field";
+      constraint = "no-ftp";
+      fields = [ "protocol" ];
+    } bend.identity)
   ];
 
   caseD = zen.run {
     lens = {
       protocol = zen.types.str;
-      port     = zen.types.port;
+      port = zen.types.port;
     };
     defs = [
       (zen.def { protocol = "ftp"; })
-      (zen.def { port     = 80;   })
+      (zen.def { port = 80; })
     ];
     check = twoCheckPipe;
   };
@@ -74,10 +95,10 @@ in
   violation = show "tcp+80 => cross-field violation located to fields" (mk "tcp" 80);
 
   # tcp+8080 -> Right: port above 1024, invariant holds
-  ok        = show "tcp+8080 => ok (port>1024)"                        (mk "tcp" 8080);
+  ok = show "tcp+8080 => ok (port>1024)" (mk "tcp" 8080);
 
   # udp+80 -> Right: udp is exempt from the tcp-only constraint
-  exempt    = show "udp+80 => exempt (constraint only applies to tcp)"  (mk "udp" 80);
+  exempt = show "udp+80 => exempt (constraint only applies to tcp)" (mk "udp" 80);
 
   # Short-circuit demo: both constraints fail, only first is returned.
   # Located to fields=[port], NOT fields=[protocol] — second check never runs.

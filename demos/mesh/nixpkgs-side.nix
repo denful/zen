@@ -20,10 +20,11 @@ let
       ];
     }).config.n
   );
-in {
+in
+{
   # success=false: the throw was caught — nixpkgs cannot negotiate, only die.
   success = attempt.success;
   # value is the fallback (false) when tryEval catches a throw.
-  value   = attempt.value;
-  note    = "lib.evalModules threw 'conflicting definition values'; tryEval caught it. No negotiation, no dependent proof — just a fatal throw.";
+  value = attempt.value;
+  note = "lib.evalModules threw 'conflicting definition values'; tryEval caught it. No negotiation, no dependent proof — just a fatal throw.";
 }

@@ -29,8 +29,10 @@ let
   ipv4 = T.refined "IPv4" T.String (T.matching "[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+");
   addrTypeOf =
     kind:
-    if kind == "dhcp" then T.Null   # dhcp => addr must be null/absent
-    else ipv4;                      # static | dynamic => addr must be an IPv4
+    if kind == "dhcp" then
+      T.Null # dhcp => addr must be null/absent
+    else
+      ipv4; # static | dynamic => addr must be an IPv4
 
   run =
     kindVal: addrVal:
@@ -48,10 +50,16 @@ let
         })
       ];
       check = zen.deptype {
-        index   = "kind";
+        index = "kind";
         depends = "addr";
         # fst: the fx ENUM type (refined String, exactly the three tags)
-        fst = T.refined "Kind" T.String (T.oneOfStr [ "static" "dynamic" "dhcp" ]);
+        fst = T.refined "Kind" T.String (
+          T.oneOfStr [
+            "static"
+            "dynamic"
+            "dhcp"
+          ]
+        );
         # snd: the dependent function — returns a DIFFERENT fx Type per kind value
         snd = addrTypeOf;
       };
@@ -59,23 +67,34 @@ let
 
   show =
     label: r:
-    { case = label; }
-    // (if r ? right
-        then { settled = "right"; value = r.right; }
-        else { settled = "left";  blame = r.left;  });
+    {
+      case = label;
+    }
+    // (
+      if r ? right then
+        {
+          settled = "right";
+          value = r.right;
+        }
+      else
+        {
+          settled = "left";
+          blame = r.left;
+        }
+    );
 in
 {
   # kind="static", addr valid IPv4 -> right
-  static_ok  = show "kind=static, addr=10.0.0.1"  (run "static" "10.0.0.1");
+  static_ok = show "kind=static, addr=10.0.0.1" (run "static" "10.0.0.1");
 
   # kind="static", addr not an IPv4 -> located left (blame shows expected=IPv4 type)
   static_bad = show "kind=static, addr=not-an-ip" (run "static" "not-an-ip");
 
   # kind="dhcp", addr=null -> right (snd dhcp = Null, null is correct)
-  dhcp_ok    = show "kind=dhcp, addr=null"         (run "dhcp" null);
+  dhcp_ok = show "kind=dhcp, addr=null" (run "dhcp" null);
 
   # kind="dhcp", addr="10.0.0.1" -> located left (dhcp forbids an address)
-  dhcp_bad   = show "kind=dhcp, addr=10.0.0.1"    (run "dhcp" "10.0.0.1");
+  dhcp_bad = show "kind=dhcp, addr=10.0.0.1" (run "dhcp" "10.0.0.1");
 
   # THE TYPE-FROM-VALUE PROOF: same addr, kind flips the required type -> flips verdict.
   #
@@ -84,9 +103,9 @@ in
   #   addr=10.0.0.1: right at static (snd=IPv4 accepts it)
   #                  left  at dhcp   (snd=Null rejects any string)
   same_addr_kind_flips = {
-    null_at_dhcp    = show "addr=null    @ kind=dhcp"    (run "dhcp"   null);
-    null_at_static  = show "addr=null    @ kind=static"  (run "static" null);
-    ip_at_static    = show "addr=10.0.0.1 @ kind=static" (run "static" "10.0.0.1");
-    ip_at_dhcp      = show "addr=10.0.0.1 @ kind=dhcp"   (run "dhcp"   "10.0.0.1");
+    null_at_dhcp = show "addr=null    @ kind=dhcp" (run "dhcp" null);
+    null_at_static = show "addr=null    @ kind=static" (run "static" null);
+    ip_at_static = show "addr=10.0.0.1 @ kind=static" (run "static" "10.0.0.1");
+    ip_at_dhcp = show "addr=10.0.0.1 @ kind=dhcp" (run "dhcp" "10.0.0.1");
   };
 }

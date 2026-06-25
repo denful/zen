@@ -9,21 +9,22 @@ let
   zen = import ../../. { };
 
   # The refined Port type: .name = "Port", .check = Int ∩ [1024..65535]
-  PortType = zen.fx.types.refined "Port" zen.fx.types.Int
-    (n: n >= 1024 && n <= 65535);
+  PortType = zen.fx.types.refined "Port" zen.fx.types.Int (n: n >= 1024 && n <= 65535);
 
   # A small local lens that surfaces the type's OWN name in the blame.
   # zen.satisfy discards the name; this 9-liner carries it forward so the
   # LOCATED left names "Port", not a generic "type-check failed".
   satisfyNamed = T: {
-    get = v:
-      if T.check v
-      then zen.bend.right v
-      else zen.bend.left {
-        why = "refined";
-        name = T.name;
-        got = v;
-      };
+    get =
+      v:
+      if T.check v then
+        zen.bend.right v
+      else
+        zen.bend.left {
+          why = "refined";
+          name = T.name;
+          got = v;
+        };
     set = _: zen.bend.right;
   };
 

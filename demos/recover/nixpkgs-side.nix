@@ -5,7 +5,10 @@ let
   lib = import <nixpkgs/lib>;
   m = lib.evalModules {
     modules = [
-      { options.port = lib.mkOption { type = lib.types.int; }; config.port = 8080; }
+      {
+        options.port = lib.mkOption { type = lib.types.int; };
+        config.port = 8080;
+      }
       { config.port = 9090; }
     ];
   };

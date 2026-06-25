@@ -21,7 +21,7 @@ let
   # Simulate merged module config.
   cfg = {
     protocol = "tcp";
-    port     = 80;      # violates "tcp => port > 1024"
+    port = 80; # violates "tcp => port > 1024"
   };
 
   # The assertions list — the nixpkgs idiom for cross-field constraints.
@@ -29,7 +29,7 @@ let
   assertions = [
     {
       assertion = !(cfg.protocol == "tcp" && cfg.port <= 1024);
-      message   = "tcp needs port > 1024 (got protocol=${cfg.protocol} port=${toString cfg.port})";
+      message = "tcp needs port > 1024 (got protocol=${cfg.protocol} port=${toString cfg.port})";
     }
   ];
 
@@ -37,10 +37,10 @@ let
 
   # evalModules aborts the whole eval with a throw — no structured value returned.
   assertionResult =
-    if failedAssertions != [ ]
-    then throw (builtins.concatStringsSep "\n"
-          (map (a: "- ${a.message}") failedAssertions))
-    else cfg;
+    if failedAssertions != [ ] then
+      throw (builtins.concatStringsSep "\n" (map (a: "- ${a.message}") failedAssertions))
+    else
+      cfg;
 in
 {
   # The throw is caught by tryEval so this file evals cleanly.
@@ -55,9 +55,9 @@ in
 
   # Summary of the limitation relative to dzm.
   limitation = {
-    failure_signal          = "unstructured throw string (no {why, constraint, fields})";
+    failure_signal = "unstructured throw string (no {why, constraint, fields})";
     fields_programmatically = false;
-    tooling_can_highlight   = false;
-    recovery_possible       = false;   # throw is fatal; no restart/handler seam
+    tooling_can_highlight = false;
+    recovery_possible = false; # throw is fatal; no restart/handler seam
   };
 }
